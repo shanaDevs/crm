@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 set -eu
 
 # Always write runtime API URL for the browser.
@@ -38,4 +38,3 @@ try {
 NODE
 
 exec node server.js
-
