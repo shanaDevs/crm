@@ -1,0 +1,783 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  CRM_ADMIN
+  IT_MANAGER
+  MARKETING_OFFICER
+  DEVELOPER
+  CUSTOMER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NURTURING
+  CONVERTED
+  LOST
+}
+
+enum PreferredContactMethod {
+  CALL
+  EMAIL
+  WHATSAPP
+  SMS
+  IN_PERSON
+}
+
+enum ActivityType {
+  CALL
+  VISIT
+  DEMO
+  MEETING
+  FOLLOW_UP
+}
+
+enum ActivityPurpose {
+  INTRODUCTION
+  QUOTATION
+  REQUIREMENTS
+  PAYMENT
+  SUPPORT
+  CUSTOM
+}
+
+enum ActivityStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  OVERDUE
+  RESCHEDULED
+}
+
+enum CallOutcome {
+  CONNECTED
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+  INTERESTED
+  NOT_INTERESTED
+  REQUESTED_ANOTHER_CALL
+  DEMO_BOOKED
+  MEETING_BOOKED
+}
+
+enum OpportunityStageCode {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DEMO_SCHEDULED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum RequirementStatus {
+  SUBMITTED
+  NEEDS_CLARIFICATION
+  REVIEWED
+  APPROVED
+  ASSIGNED
+  IN_PROGRESS
+  QA
+  CUSTOMER_REVIEW
+  COMPLETED
+  REJECTED
+  ON_HOLD
+  CANCELLED
+}
+
+enum TicketType {
+  BUG
+  SUPPORT
+  TASK
+  CHANGE_REQUEST
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  WAITING_INTERNAL
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+}
+
+enum ReminderJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum CommentVisibility {
+  INTERNAL
+  CUSTOMER_VISIBLE
+}
+
+enum AttachmentEntityType {
+  BUSINESS_CARD
+  COMPANY
+  CONTACT
+  VISIT
+  REQUIREMENT
+  TICKET
+  COMMENT
+  DEVELOPMENT_TASK
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        RoleCode @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  phone              String?
+  timezone           String       @default("UTC")
+  isActive           Boolean      @default(true)
+  roleId             String
+  companyId          String?
+  avatarUrl          String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  role               Role         @relation(fields: [roleId], references: [id])
+  company            Company?     @relation("CustomerUsers", fields: [companyId], references: [id])
+  sessions           Session[]
+  assignedCompanies  Company[]    @relation("AssignedOfficer")
+  managedProducts    Product[]    @relation("ProductManager")
+  productMemberships ProductTeamMember[]
+  visitsCreated      Visit[]      @relation("VisitCreatedBy")
+  followUpsAssigned  FollowUp[]   @relation("FollowUpAssignee")
+  followUpsCreated   FollowUp[]   @relation("FollowUpCreatedBy")
+  callLogs           CallLog[]
+  opportunitiesOwned Opportunity[] @relation("OpportunityOwner")
+  requirementsManaged Requirement[] @relation("RequirementManager")
+  requirementAssignments Assignment[]
+  tasksAssigned      DevelopmentTask[] @relation("TaskAssignee")
+  ticketsAssigned    Ticket[]     @relation("TicketAssignee")
+  ticketsCreated     Ticket[]     @relation("TicketCreatedBy")
+  comments           Comment[]
+  notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
+  notificationPreference NotificationPreference?
+  auditLogs          AuditLog[]
+  activityHistory    ActivityHistory[]
+  uploadedAttachments Attachment[] @relation("AttachmentUploader")
+
+  @@index([roleId])
+  @@index([companyId])
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Company {
+  id                    String                 @id @default(cuid())
+  name                  String
+  website               String?
+  businessCategory      String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  postalCode            String?
+  country               String?
+  leadSource            String?
+  leadStatus            LeadStatus             @default(NEW)
+  preferredContactMethod PreferredContactMethod?
+  callingHoursStart     String?
+  callingHoursEnd       String?
+  timezone              String                 @default("UTC")
+  tags                  String[]               @default([])
+  notes                 String?
+  assignedOfficerId     String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  assignedOfficer       User?                  @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id])
+  contacts              Contact[]
+  businessCards         BusinessCard[]
+  visits                Visit[]
+  followUps             FollowUp[]
+  opportunities         Opportunity[]
+  requirements          Requirement[]
+  tickets               Ticket[]
+  customerUsers         User[]                 @relation("CustomerUsers")
+  interestedProducts    CompanyProductInterest[]
+  customFieldValues     CustomFieldValue[]
+
+  @@index([name])
+  @@index([leadStatus])
+  @@index([assignedOfficerId])
+}
+
+model Contact {
+  id           String    @id @default(cuid())
+  companyId    String
+  firstName    String
+  lastName     String
+  jobTitle     String?
+  email        String?
+  mobile       String?
+  phone        String?
+  website      String?
+  linkedinUrl  String?
+  twitterUrl   String?
+  otherSocial  Json?
+  isPrimary    Boolean   @default(false)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  businessCards BusinessCard[]
+  visits       Visit[]
+  followUps    FollowUp[]
+  requirements Requirement[]
+  tickets      Ticket[]
+
+  @@index([companyId])
+  @@index([email])
+  @@index([mobile])
+}
+
+model BusinessCard {
+  id              String   @id @default(cuid())
+  companyId       String?
+  contactId       String?
+  frontImageKey   String
+  backImageKey    String?
+  extractedData   Json?
+  confidenceMap   Json?
+  rawAiResponse   Json?
+  reviewed        Boolean  @default(false)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company? @relation(fields: [companyId], references: [id])
+  contact         Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([companyId])
+  @@index([contactId])
+}
+
+model Visit {
+  id            String   @id @default(cuid())
+  companyId     String
+  contactId     String?
+  visitedAt     DateTime
+  location      String?
+  notes         String?
+  nextAction    String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact       Contact? @relation(fields: [contactId], references: [id])
+  createdBy     User     @relation("VisitCreatedBy", fields: [createdById], references: [id])
+  followUps     FollowUp[]
+
+  @@index([companyId])
+  @@index([visitedAt])
+  @@index([createdById])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?
+  isActive    Boolean  @default(true)
+  managerId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  manager     User?    @relation("ProductManager", fields: [managerId], references: [id])
+  teamMembers ProductTeamMember[]
+  opportunities Opportunity[]
+  followUps   FollowUp[]
+  requirements Requirement[]
+  tickets     Ticket[]
+  interestedCompanies CompanyProductInterest[]
+  customFieldValues CustomFieldValue[]
+
+  @@index([name])
+  @@index([isActive])
+  @@index([managerId])
+}
+
+model ProductTeamMember {
+  id        String  @id @default(cuid())
+  productId String
+  userId    String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+}
+
+model CompanyProductInterest {
+  id        String  @id @default(cuid())
+  companyId String
+  productId String
+  notes     String?
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, productId])
+  @@index([companyId])
+  @@index([productId])
+}
+
+model OpportunityStage {
+  id          String               @id @default(cuid())
+  code        OpportunityStageCode @unique
+  name        String
+  sortOrder   Int
+  isWon       Boolean              @default(false)
+  isLost      Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  opportunities Opportunity[]
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  companyId   String
+  productId   String
+  stageId     String
+  ownerId     String?
+  title       String
+  value       Decimal? @db.Decimal(12, 2)
+  currency    String   @default("USD")
+  expectedCloseDate DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+  stage       OpportunityStage @relation(fields: [stageId], references: [id])
+  owner       User?    @relation("OpportunityOwner", fields: [ownerId], references: [id])
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([stageId])
+  @@index([ownerId])
+}
+
+model FollowUp {
+  id              String          @id @default(cuid())
+  companyId       String
+  contactId       String?
+  productId       String?
+  visitId         String?
+  activityType    ActivityType
+  purpose         ActivityPurpose
+  customPurpose   String?
+  scheduledAt     DateTime
+  timezone        String          @default("UTC")
+  reminderMinutes Int             @default(15)
+  priority        Priority        @default(MEDIUM)
+  status          ActivityStatus  @default(SCHEDULED)
+  notes           String?
+  assigneeId      String
+  createdById     String
+  parentFollowUpId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact?        @relation(fields: [contactId], references: [id])
+  product         Product?        @relation(fields: [productId], references: [id])
+  visit           Visit?          @relation(fields: [visitId], references: [id])
+  assignee        User            @relation("FollowUpAssignee", fields: [assigneeId], references: [id])
+  createdBy       User            @relation("FollowUpCreatedBy", fields: [createdById], references: [id])
+  parentFollowUp  FollowUp?       @relation("FollowUpReschedule", fields: [parentFollowUpId], references: [id])
+  childFollowUps  FollowUp[]      @relation("FollowUpReschedule")
+  callLogs        CallLog[]
+  history         ActivityHistory[]
+  reminderJobs    ReminderJob[]
+
+  @@index([companyId])
+  @@index([assigneeId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([productId])
+}
+
+model CallLog {
+  id          String       @id @default(cuid())
+  followUpId  String
+  outcome     CallOutcome
+  notes       String?
+  durationSec Int?
+  loggedById  String
+  loggedAt    DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  followUp    FollowUp     @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  loggedBy    User         @relation(fields: [loggedById], references: [id])
+
+  @@index([followUpId])
+  @@index([loggedById])
+}
+
+model ActivityHistory {
+  id          String   @id @default(cuid())
+  followUpId  String
+  changedById String
+  changeType  String
+  fromValue   Json?
+  toValue     Json?
+  note        String?
+  createdAt   DateTime @default(now())
+  followUp    FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  changedBy   User     @relation(fields: [changedById], references: [id])
+
+  @@index([followUpId])
+  @@index([changedById])
+}
+
+model Requirement {
+  id                  String            @id @default(cuid())
+  title               String
+  description         String
+  companyId           String
+  contactId           String?
+  productId           String
+  businessProblem     String?
+  expectedResult      String?
+  category            String?
+  priority            Priority          @default(MEDIUM)
+  acceptanceCriteria  String?
+  requestedDeliveryDate DateTime?
+  estimateHours       Decimal?          @db.Decimal(8, 2)
+  targetDeliveryDate  DateTime?
+  status              RequirementStatus @default(SUBMITTED)
+  managerId           String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  company             Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact             Contact?          @relation(fields: [contactId], references: [id])
+  product             Product           @relation(fields: [productId], references: [id])
+  manager             User?             @relation("RequirementManager", fields: [managerId], references: [id])
+  revisions           RequirementRevision[]
+  tasks               DevelopmentTask[]
+  assignments         Assignment[]
+  comments            Comment[]
+  tickets             Ticket[]
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([status])
+  @@index([managerId])
+}
+
+model RequirementRevision {
+  id            String   @id @default(cuid())
+  requirementId String
+  version       Int
+  snapshot      Json
+  changeNote    String?
+  createdAt     DateTime @default(now())
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, version])
+  @@index([requirementId])
+}
+
+model DevelopmentTask {
+  id            String   @id @default(cuid())
+  requirementId String
+  title         String
+  description   String?
+  status        String   @default("TODO")
+  priority      Priority @default(MEDIUM)
+  assigneeId    String?
+  estimateHours Decimal? @db.Decimal(8, 2)
+  dueDate       DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  assignee      User?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  @@index([requirementId])
+  @@index([assigneeId])
+}
+
+model Assignment {
+  id            String   @id @default(cuid())
+  requirementId String
+  userId        String
+  roleLabel     String?
+  assignedAt    DateTime @default(now())
+  unassignedAt  DateTime?
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([requirementId])
+  @@index([userId])
+}
+
+model Ticket {
+  id              String       @id @default(cuid())
+  ticketNumber    String       @unique
+  title           String
+  description     String
+  companyId       String
+  contactId       String?
+  productId       String
+  requirementId   String?
+  type            TicketType
+  priority        Priority     @default(MEDIUM)
+  status          TicketStatus @default(OPEN)
+  dueDate         DateTime?
+  assigneeId      String?
+  createdById     String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact?     @relation(fields: [contactId], references: [id])
+  product         Product      @relation(fields: [productId], references: [id])
+  requirement     Requirement? @relation(fields: [requirementId], references: [id])
+  assignee        User?        @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  createdBy       User         @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  comments        Comment[]
+  statusHistory   TicketStatusHistory[]
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([ticketNumber])
+}
+
+model TicketStatusHistory {
+  id         String        @id @default(cuid())
+  ticketId   String
+  fromStatus TicketStatus?
+  toStatus   TicketStatus
+  note       String?
+  changedById String?
+  createdAt  DateTime      @default(now())
+  ticket     Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Comment {
+  id            String            @id @default(cuid())
+  body          String
+  visibility    CommentVisibility @default(INTERNAL)
+  authorId      String
+  requirementId String?
+  ticketId      String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  author        User              @relation(fields: [authorId], references: [id])
+  requirement   Requirement?      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  ticket        Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@index([ticketId])
+  @@index([authorId])
+}
+
+model Attachment {
+  id           String               @id @default(cuid())
+  entityType   AttachmentEntityType
+  entityId     String
+  fileKey      String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String?
+  createdAt    DateTime             @default(now())
+  uploadedBy   User?                @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([uploadedById])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  channel   NotificationChannel @default(IN_APP)
+  linkUrl   String?
+  isRead    Boolean             @default(false)
+  meta      Json?
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model ReminderJob {
+  id          String            @id @default(cuid())
+  followUpId  String
+  runAt       DateTime
+  status      ReminderJobStatus @default(PENDING)
+  attempts    Int               @default(0)
+  lastError   String?
+  dedupeKey   String            @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  followUp    FollowUp          @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@index([runAt, status])
+  @@index([followUpId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  inAppEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  emailEnabled    Boolean  @default(false)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CustomFieldDefinition {
+  id         String   @id @default(cuid())
+  entityType String
+  key        String
+  label      String
+  fieldType  String
+  options    Json?
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  values     CustomFieldValue[]
+
+  @@unique([entityType, key])
+  @@index([entityType])
+}
+
+model CustomFieldValue {
+  id           String                @id @default(cuid())
+  definitionId String
+  companyId    String?
+  productId    String?
+  value        Json
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  definition   CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  company      Company?              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product      Product?              @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([definitionId])
+  @@index([companyId])
+  @@index([productId])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  meta       Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

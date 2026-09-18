@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f3eb;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --border: #e5dfd0;
+  --muted: #6b6558;
+  --primary: #c9a227;
+  --primary-hover: #b8911f;
+  --primary-fg: #0a0a0a;
+  --danger: #b91c1c;
+  --sidebar: #000000;
+  --gold-soft: rgba(201, 162, 39, 0.14);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+}
+
+a {
+  text-decoration: none;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #525252 transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #525252;
+  border-radius: 999px;
+}
+
+/* Sidebar navigation — white labels, gold icons, gold active */
+.crm-sidebar .crm-nav-link {
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.crm-sidebar .crm-nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.crm-sidebar nav a .crm-nav-label {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  fill: #ffffff;
+}
+
+.crm-sidebar nav a .crm-nav-icon,
+.crm-sidebar nav a .crm-nav-icon svg {
+  color: #c9a227 !important;
+  stroke: #c9a227 !important;
+}
+
+.crm-sidebar .crm-nav-link[data-active="true"] {
+  background: #c9a227 !important;
+}
+
+.crm-sidebar .crm-nav-link[data-active="true"] .crm-nav-label {
+  color: #0a0a0a !important;
+  -webkit-text-fill-color: #0a0a0a !important;
+}
+
+.crm-sidebar .crm-nav-link[data-active="true"] .crm-nav-icon,
+.crm-sidebar .crm-nav-link[data-active="true"] .crm-nav-icon svg {
+  color: #0a0a0a !important;
+  stroke: #0a0a0a !important;
+}
+
+@media (max-width: 1023px) {
+  .crm-sidebar .crm-nav-link {
+    min-height: 2.75rem;
+  }
+}

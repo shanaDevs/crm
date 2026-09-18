@@ -1,0 +1,28 @@
+{
+  "name": "crmtool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRM Tool monorepo — Next.js frontend + Express backend",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c teal,cyan \"npm run dev -w crmtool-backend\" \"npm run dev -w crmtool-frontend\"",
+    "dev:backend": "npm run dev -w crmtool-backend",
+    "dev:frontend": "npm run dev -w crmtool-frontend",
+    "build": "npm run build -w crmtool-backend && npm run build -w crmtool-frontend",
+    "db:generate": "npm run db:generate -w crmtool-backend",
+    "db:push": "npm run db:push -w crmtool-backend",
+    "db:seed": "npm run db:seed -w crmtool-backend",
+    "db:studio": "npm run db:studio -w crmtool-backend",
+    "start:backend": "npm run start -w crmtool-backend",
+    "start:frontend": "npm run start -w crmtool-frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
