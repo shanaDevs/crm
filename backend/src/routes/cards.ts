@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { extractBusinessCard } from '../services/aiCard'
 import { uploadPrivateFile } from '../services/storage'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 const upload = multer({
@@ -57,7 +58,7 @@ router.post(
         backImageKey: backKey,
         extractedData: extraction.data,
         confidenceMap: extraction.data.confidence || {},
-        rawAiResponse: extraction.raw as object,
+        rawAiResponse: asJson(extraction.raw),
         reviewed: false,
         createdById: req.user!.id,
       },

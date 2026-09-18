@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { notifyUser } from '../services/notifications'
 import { requirementCreateSchema } from '../validators/schemas'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 router.use(requireAuth)
@@ -71,7 +72,7 @@ router.post('/', requirePermission('requirements.write'), async (req, res) => {
 
 router.get('/:id', requirePermission('requirements.read'), async (req, res) => {
   const item = await prisma.requirement.findUnique({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     include: {
       company: true,
       contact: true,
@@ -103,11 +104,11 @@ router.patch('/:id/status', requirePermission('requirements.manage'), async (req
   if (!Object.values(RequirementStatus).includes(status)) {
     return res.status(400).json({ error: 'Invalid status' })
   }
-  const existing = await prisma.requirement.findUnique({ where: { id: req.params.id } })
+  const existing = await prisma.requirement.findUnique({ where: { id: param(req, 'id') } })
   if (!existing) return res.status(404).json({ error: 'Not found' })
 
   const updated = await prisma.requirement.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: {
       status,
       managerId: req.body.managerId || existing.managerId || req.user!.id,
@@ -138,7 +139,7 @@ router.post('/:id/assign', requirePermission('requirements.manage'), async (req,
   const developerIds: string[] = req.body.developerIds || []
   if (!developerIds.length) return res.status(400).json({ error: 'developerIds required' })
 
-  const requirement = await prisma.requirement.findUnique({ where: { id: req.params.id } })
+  const requirement = await prisma.requirement.findUnique({ where: { id: param(req, 'id') } })
   if (!requirement) return res.status(404).json({ error: 'Not found' })
 
   await prisma.assignment.updateMany({
@@ -178,7 +179,7 @@ router.post('/:id/assign', requirePermission('requirements.manage'), async (req,
 router.post('/:id/tasks', requirePermission('requirements.manage'), async (req, res) => {
   const task = await prisma.developmentTask.create({
     data: {
-      requirementId: req.params.id,
+      requirementId: param(req, 'id'),
       title: req.body.title,
       description: req.body.description,
       priority: req.body.priority || 'MEDIUM',
@@ -202,7 +203,7 @@ router.post('/:id/comments', requirePermission('requirements.write'), async (req
 
   const comment = await prisma.comment.create({
     data: {
-      requirementId: req.params.id,
+      requirementId: param(req, 'id'),
       body: req.body.body,
       visibility,
       authorId: req.user!.id,

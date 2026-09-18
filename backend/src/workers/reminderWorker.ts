@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { processDueReminders } from './services/reminders'
+import { processDueReminders } from '../services/reminders'
 
 async function main() {
   const n = await processDueReminders()

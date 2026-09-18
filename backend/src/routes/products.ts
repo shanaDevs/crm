@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { opportunityCreateSchema, productCreateSchema } from '../validators/schemas'
+import { param, asJson } from '../lib/http'
 
 const productsRouter = Router()
 productsRouter.use(requireAuth)
@@ -38,7 +39,7 @@ productsRouter.post('/', requirePermission('products.write'), async (req, res) =
 
 productsRouter.patch('/:id', requirePermission('products.write'), async (req, res) => {
   const product = await prisma.product.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: {
       name: req.body.name,
       description: req.body.description,
@@ -100,7 +101,7 @@ opportunitiesRouter.patch('/:id/stage', requirePermission('opportunities.write')
   const stage = await prisma.opportunityStage.findUnique({ where: { code: req.body.stageCode } })
   if (!stage) return res.status(400).json({ error: 'Invalid stage' })
   const opportunity = await prisma.opportunity.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: { stageId: stage.id },
     include: { stage: true },
   })

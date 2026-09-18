@@ -3,6 +3,7 @@ import { RoleCode } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { companyCreateSchema } from '../validators/schemas'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 
@@ -63,7 +64,7 @@ router.get('/duplicates', requirePermission('customers.write'), async (req, res)
 
 router.get('/:id', requirePermission('customers.read'), async (req, res) => {
   const company = await prisma.company.findUnique({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     include: {
       contacts: true,
       businessCards: true,
@@ -146,7 +147,7 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
 
 router.patch('/:id', requirePermission('customers.write'), async (req, res) => {
   const company = await prisma.company.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: {
       name: req.body.name,
       website: req.body.website,

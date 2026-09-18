@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { notifyUser } from '../services/notifications'
 import { ticketCreateSchema } from '../validators/schemas'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 router.use(requireAuth)
@@ -76,7 +77,7 @@ router.post('/', requirePermission('tickets.write'), async (req, res) => {
 
 router.get('/:id', requirePermission('tickets.read'), async (req, res) => {
   const ticket = await prisma.ticket.findUnique({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     include: {
       company: true,
       contact: true,
@@ -104,11 +105,11 @@ router.get('/:id', requirePermission('tickets.read'), async (req, res) => {
 
 router.patch('/:id/assign', requirePermission('tickets.manage'), async (req, res) => {
   const assigneeId = req.body.assigneeId as string
-  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } })
+  const existing = await prisma.ticket.findUnique({ where: { id: param(req, 'id') } })
   if (!existing) return res.status(404).json({ error: 'Not found' })
 
   const ticket = await prisma.ticket.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: { assigneeId },
   })
 
@@ -125,11 +126,11 @@ router.patch('/:id/assign', requirePermission('tickets.manage'), async (req, res
 
 router.patch('/:id/status', requirePermission('tickets.write'), async (req, res) => {
   const toStatus = req.body.status as TicketStatus
-  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } })
+  const existing = await prisma.ticket.findUnique({ where: { id: param(req, 'id') } })
   if (!existing) return res.status(404).json({ error: 'Not found' })
 
   const ticket = await prisma.ticket.update({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     data: {
       status: toStatus,
       statusHistory: {
@@ -157,7 +158,7 @@ router.post('/:id/comments', requirePermission('tickets.write'), async (req, res
 
   const comment = await prisma.comment.create({
     data: {
-      ticketId: req.params.id,
+      ticketId: param(req, 'id'),
       body: req.body.body,
       visibility,
       authorId: req.user!.id,
@@ -165,7 +166,7 @@ router.post('/:id/comments', requirePermission('tickets.write'), async (req, res
   })
 
   if (visibility === CommentVisibility.CUSTOMER_VISIBLE) {
-    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } })
+    const ticket = await prisma.ticket.findUnique({ where: { id: param(req, 'id') } })
     if (ticket?.assigneeId && req.user?.roleCode === RoleCode.CUSTOMER) {
       await notifyUser({
         userId: ticket.assigneeId,

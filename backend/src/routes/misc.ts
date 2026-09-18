@@ -3,6 +3,7 @@ import { RoleCode } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { getVapidPublicKey } from '../services/notifications'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 router.use(requireAuth)
@@ -26,7 +27,7 @@ router.post('/read-all', async (req, res) => {
 
 router.patch('/:id/read', async (req, res) => {
   const n = await prisma.notification.updateMany({
-    where: { id: req.params.id, userId: req.user!.id },
+    where: { id: param(req, 'id'), userId: req.user!.id },
     data: { isRead: true },
   })
   return res.json({ updated: n.count })
@@ -210,10 +211,12 @@ settingsRouter.get('/', requirePermission('settings.read'), async (_req, res) =>
 })
 
 settingsRouter.put('/:key', requirePermission('settings.write'), async (req, res) => {
+  const key = param(req, 'key')
+  const value = asJson(req.body.value) ?? {}
   const setting = await prisma.systemSetting.upsert({
-    where: { key: req.params.key },
-    create: { key: req.params.key, value: req.body.value },
-    update: { value: req.body.value },
+    where: { key },
+    create: { key, value },
+    update: { value },
   })
   return res.json(setting)
 })

@@ -1,6 +1,6 @@
 import webpush from 'web-push'
 import nodemailer from 'nodemailer'
-import { NotificationChannel } from '@prisma/client'
+import { NotificationChannel, Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 
 const vapidPublic = process.env.VAPID_PUBLIC_KEY
@@ -40,7 +40,7 @@ export async function notifyUser(params: {
   title: string
   body: string
   linkUrl?: string
-  meta?: Record<string, unknown>
+  meta?: Prisma.InputJsonValue
 }) {
   const prefs = await prisma.notificationPreference.findUnique({ where: { userId: params.userId } })
   const quiet = inQuietHours(prefs?.quietHoursStart, prefs?.quietHoursEnd)

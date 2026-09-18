@@ -5,6 +5,7 @@ import { requireAuth, requirePermission } from '../middleware/auth'
 import { scheduleReminder } from '../services/reminders'
 import { callLogSchema, followUpCreateSchema } from '../validators/schemas'
 import { notifyUser } from '../services/notifications'
+import { param, asJson } from '../lib/http'
 
 const router = Router()
 router.use(requireAuth)
@@ -102,7 +103,7 @@ router.post('/', requirePermission('followups.write'), async (req, res) => {
 
 router.get('/:id', requirePermission('followups.read'), async (req, res) => {
   const item = await prisma.followUp.findUnique({
-    where: { id: req.params.id },
+    where: { id: param(req, 'id') },
     include: {
       company: true,
       contact: true,
@@ -120,7 +121,7 @@ router.get('/:id', requirePermission('followups.read'), async (req, res) => {
 })
 
 router.post('/:id/reschedule', requirePermission('followups.write'), async (req, res) => {
-  const original = await prisma.followUp.findUnique({ where: { id: req.params.id } })
+  const original = await prisma.followUp.findUnique({ where: { id: param(req, 'id') } })
   if (!original) return res.status(404).json({ error: 'Not found' })
 
   const scheduledAt = new Date(req.body.scheduledAt)
@@ -171,7 +172,7 @@ router.post('/:id/log-call', requirePermission('followups.write'), async (req, r
   const parsed = callLogSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
 
-  const followUp = await prisma.followUp.findUnique({ where: { id: req.params.id } })
+  const followUp = await prisma.followUp.findUnique({ where: { id: param(req, 'id') } })
   if (!followUp) return res.status(404).json({ error: 'Not found' })
 
   const log = await prisma.callLog.create({
