@@ -24,10 +24,21 @@ import { requireAuth, requirePermission } from './middleware/auth'
 export function createApp() {
   const app = express()
 
+  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+      origin(origin, callback) {
+        // Allow non-browser clients (no Origin) and configured frontends
+        if (!origin || corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+        return callback(null, false)
+      },
       credentials: true,
     })
   )

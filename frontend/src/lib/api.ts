@@ -1,5 +1,24 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 const TOKEN_KEY = 'crm_token'
+
+declare global {
+  interface Window {
+    __CRM_API_URL__?: string
+  }
+}
+
+function trimSlash(url: string) {
+  return url.replace(/\/+$/, '')
+}
+
+/** Runtime CapRover/env.js wins; then NEXT_PUBLIC_*; localhost only for local dev. */
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.__CRM_API_URL__) {
+    return trimSlash(window.__CRM_API_URL__)
+  }
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL?.trim()
+  if (fromEnv) return trimSlash(fromEnv)
+  return 'http://localhost:4000'
+}
 
 export class ApiError extends Error {
   status: number
@@ -34,6 +53,7 @@ type RequestOptions = {
 
 export async function api<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, formData, headers = {}, auth = true } = options
+  const API_URL = getApiBaseUrl()
   const url = path.startsWith('http') ? path : `${API_URL}${path.startsWith('/api') ? path : `/api${path}`}`
 
   const finalHeaders: Record<string, string> = { ...headers }
@@ -76,4 +96,6 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
   return data as T
 }
 
-export const apiUrl = API_URL
+export const apiUrl = typeof window === 'undefined'
+  ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+  : ''
