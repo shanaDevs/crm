@@ -12,20 +12,66 @@ function spacesConfigured() {
     process.env.DO_SPACES_KEY &&
       process.env.DO_SPACES_SECRET &&
       process.env.DO_SPACES_BUCKET &&
-      process.env.DO_SPACES_ENDPOINT
+      (process.env.DO_SPACES_ENDPOINT || process.env.DO_SPACES_REGION)
   )
+}
+
+/**
+ * DigitalOcean Spaces TLS cert is only `*.sgp1.digitaloceanspaces.com`.
+ * Buckets with dots (e.g. `dartcodes.data`) cannot use virtual-hosted URLs like
+ * `https://dartcodes.data.sgp1.digitaloceanspaces.com` — path-style on the
+ * region endpoint is required: `https://sgp1.digitaloceanspaces.com/bucket/key`.
+ */
+function resolveSpacesEndpoint() {
+  const region = (process.env.DO_SPACES_REGION || 'sgp1').trim()
+  const raw = (process.env.DO_SPACES_ENDPOINT || '').trim().replace(/\/+$/, '')
+  const bucket = (process.env.DO_SPACES_BUCKET || '').trim()
+
+  if (!raw) {
+    return `https://${region}.digitaloceanspaces.com`
+  }
+
+  try {
+    const u = new URL(raw.includes('://') ? raw : `https://${raw}`)
+    const host = u.hostname.toLowerCase()
+
+    // Already a region endpoint: sgp1.digitaloceanspaces.com
+    if (/^[a-z0-9-]+\.digitaloceanspaces\.com$/.test(host)) {
+      return `${u.protocol}//${host}`
+    }
+
+    // Virtual-hosted / bucket subdomain → strip to region endpoint
+    // e.g. dartcodes.data.sgp1.digitaloceanspaces.com → sgp1.digitaloceanspaces.com
+    const m = host.match(/(?:^|\.)(([a-z0-9-]+)\.digitaloceanspaces\.com)$/)
+    if (m) {
+      return `${u.protocol}//${m[1]}`
+    }
+  } catch {
+    // fall through
+  }
+
+  // If someone pasted the bucket host without parsing, still prefer region URL
+  if (bucket && raw.includes(bucket)) {
+    return `https://${region}.digitaloceanspaces.com`
+  }
+
+  return raw
 }
 
 function getClient() {
   if (!spacesConfigured()) return null
+
+  const endpoint = resolveSpacesEndpoint()
+
   return new S3Client({
-    region: process.env.DO_SPACES_REGION || 'nyc3',
-    endpoint: process.env.DO_SPACES_ENDPOINT,
+    region: process.env.DO_SPACES_REGION || 'sgp1',
+    endpoint,
     credentials: {
       accessKeyId: process.env.DO_SPACES_KEY!,
       secretAccessKey: process.env.DO_SPACES_SECRET!,
     },
-    forcePathStyle: false,
+    // Required for buckets with dots (TLS wildcard is only *.sgp1.digitaloceanspaces.com).
+    forcePathStyle: true,
   })
 }
 
@@ -85,7 +131,11 @@ export async function testSpacesConnection() {
   }
   try {
     await client.send(new HeadBucketCommand({ Bucket: process.env.DO_SPACES_BUCKET! }))
-    return { ok: true, mode: 'spaces', message: 'Connected to DigitalOcean Spaces' }
+    return {
+      ok: true,
+      mode: 'spaces',
+      message: `Connected to DigitalOcean Spaces (${resolveSpacesEndpoint()}, path-style)`,
+    }
   } catch (err) {
     return { ok: false, mode: 'spaces', message: err instanceof Error ? err.message : 'Connection failed' }
   }
