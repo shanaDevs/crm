@@ -26,7 +26,8 @@ ENV API_URL=https://crm-server.dartcodes.cloud
 RUN apk add --no-cache wget \
   && addgroup -S nodejs && adduser -S nextjs -G nodejs
 
-COPY --from=build /app/public ./public
+# public must be writable by nextjs so entrypoint can regenerate env.js
+COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
