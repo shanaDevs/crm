@@ -1,2 +1,2 @@
-// Generated at container start in production. Local default for `next dev`.
-window.__CRM_API_URL__ = '';
+// Overwritten at container start. Hosted apps default to live API.
+window.__CRM_API_URL__ = 'https://crm-server.dartcodes.cloud';
