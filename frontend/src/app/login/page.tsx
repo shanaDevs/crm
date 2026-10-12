@@ -4,7 +4,10 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
-import { Button, ErrorBanner, Field, Input } from '@/components/ui'
+import { Button, ErrorBanner, Field } from '@/components/ui'
+
+const loginInputClass =
+  'h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 text-sm text-white caret-white outline-none transition placeholder:text-neutral-500 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/25 autofill:shadow-[inset_0_0_0_1000px_#1a1a1a] autofill:[-webkit-text-fill-color:#fff]'
 
 export default function LoginPage() {
   const { login, user, loading, isCustomer } = useAuth()
@@ -45,22 +48,22 @@ export default function LoginPage() {
         <ErrorBanner message={error} />
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Email">
-            <Input
+            <input
               type="email"
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="border-[#333] bg-[#1a1a1a] text-white placeholder:text-neutral-500 focus:border-[var(--primary)]"
+              className={loginInputClass}
               required
             />
           </Field>
           <Field label="Password">
-            <Input
+            <input
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="border-[#333] bg-[#1a1a1a] text-white placeholder:text-neutral-500 focus:border-[var(--primary)]"
+              className={loginInputClass}
               required
             />
           </Field>
