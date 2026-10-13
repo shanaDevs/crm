@@ -18,50 +18,80 @@ import {
 } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 
+const emptyForm = () => ({ name: '', description: '', category: '', isActive: true })
+
 export default function ProductsPage() {
-  const { isAdmin, isManager } = useAuth()
-  const canWrite = isAdmin || isManager
+  const { can } = useAuth()
+  const canWrite = can('products.write')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', category: '' })
+  const [form, setForm] = useState(emptyForm)
 
-  async function load() {
-    setLoading(true)
-    try {
-      setProducts(await api<Product[]>('/api/products'))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load products')
-    } finally {
-      setLoading(false)
-    }
+  function load() {
+    return api<Product[]>('/api/products')
+      .then(setProducts)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load products'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     void load()
   }, [])
 
-  async function onCreate(e: FormEvent) {
+  function openCreate() {
+    setEditingId(null)
+    setForm(emptyForm())
+    setFormError(null)
+    setOpen(true)
+  }
+
+  function openEdit(product: Product) {
+    setEditingId(product.id)
+    setForm({
+      name: product.name,
+      description: product.description || '',
+      category: product.category || '',
+      isActive: product.isActive !== false,
+    })
+    setFormError(null)
+    setOpen(true)
+  }
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setFormError(null)
+    const body = {
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      category: form.category.trim() || null,
+      isActive: form.isActive,
+    }
     try {
-      await api('/api/products', {
-        method: 'POST',
-        body: {
-          name: form.name,
-          description: form.description || null,
-          category: form.category || null,
-        },
-      })
+      if (editingId) await api(`/api/products/${editingId}`, { method: 'PATCH', body })
+      else await api('/api/products', { method: 'POST', body })
       setOpen(false)
-      setForm({ name: '', description: '', category: '' })
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create product')
+      setFormError(err instanceof ApiError ? err.message : 'Failed to save product')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function onDelete(product: Product) {
+    if (!window.confirm(`Delete product "${product.name}"?`)) return
+    setError(null)
+    try {
+      await api(`/api/products/${product.id}`, { method: 'DELETE' })
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete product')
     }
   }
 
@@ -70,17 +100,13 @@ export default function ProductsPage() {
       <PageHeader
         title="Products"
         description="Product catalog used across opportunities, requirements, and tickets."
-        actions={
-          canWrite ? (
-            <Button onClick={() => setOpen(true)}>Add product</Button>
-          ) : undefined
-        }
+        actions={canWrite ? <Button onClick={openCreate}>Add product</Button> : undefined}
       />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
       ) : products.length === 0 ? (
-        <EmptyState title="No products" />
+        <EmptyState title="No products" description={canWrite ? 'Use “Add product” to create one.' : undefined} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => (
@@ -100,13 +126,24 @@ export default function ProductsPage() {
                   ? ` · ${product._count.opportunities} opp · ${product._count.requirements} req · ${product._count.tickets} tix`
                   : ''}
               </p>
+              {canWrite ? (
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => openEdit(product)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => void onDelete(product)}>
+                    Delete
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>
       )}
 
-      <Modal open={open} title="New product" onClose={() => setOpen(false)}>
-        <form onSubmit={onCreate} className="space-y-3">
+      <Modal open={open} title={editingId ? 'Edit product' : 'New product'} onClose={() => setOpen(false)}>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <ErrorBanner message={formError} />
           <Field label="Name">
             <Input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </Field>
@@ -119,8 +156,17 @@ export default function ProductsPage() {
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />
           </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--primary)]"
+              checked={form.isActive}
+              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+            />
+            Active
+          </label>
           <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? 'Saving…' : 'Create product'}
+            {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create product'}
           </Button>
         </form>
       </Modal>

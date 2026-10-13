@@ -2,8 +2,10 @@ import { Router } from 'express'
 import { RoleCode } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
-import { companyCreateSchema } from '../validators/schemas'
+import type { z } from 'zod'
+import { companyCreateSchema, companyUpdateSchema, contactSchema } from '../validators/schemas'
 import { param, asJson } from '../lib/http'
+import { createFollowUp, parseFollowUpPlan } from '../services/followUps'
 
 const router = Router()
 
@@ -22,6 +24,8 @@ router.get('/', requirePermission('customers.read'), async (req, res) => {
   if (req.user?.roleCode === RoleCode.CUSTOMER && !req.user.companyId) {
     return res.json([])
   }
+  const levelId = String(req.query.levelId || '').trim()
+  if (levelId) where.levelId = levelId === 'none' ? null : levelId
   if (q) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
@@ -36,6 +40,7 @@ router.get('/', requirePermission('customers.read'), async (req, res) => {
     include: {
       contacts: true,
       assignedOfficer: { select: { id: true, firstName: true, lastName: true } },
+      level: true,
       interestedProducts: { include: { product: true } },
       _count: { select: { followUps: true, opportunities: true, tickets: true } },
     },
@@ -66,8 +71,9 @@ router.get('/:id', requirePermission('customers.read'), async (req, res) => {
   const company = await prisma.company.findUnique({
     where: { id: param(req, 'id') },
     include: {
-      contacts: true,
-      businessCards: true,
+      contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
+      businessCards: { orderBy: { createdAt: 'desc' } },
+      level: true,
       visits: { orderBy: { visitedAt: 'desc' }, take: 50 },
       followUps: { orderBy: { scheduledAt: 'desc' }, take: 50, include: { callLogs: true, assignee: true } },
       opportunities: { include: { product: true, stage: true } },
@@ -88,6 +94,8 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
   const parsed = companyCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
+  const plan = parseFollowUpPlan(req.body.followUp, req.user!)
+  if (!plan.ok) return res.status(plan.status).json({ error: plan.error })
 
   const company = await prisma.company.create({
     data: {
@@ -108,6 +116,7 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
       tags: data.tags || [],
       notes: data.notes,
       assignedOfficerId: data.assignedOfficerId || req.user!.id,
+      levelId: data.levelId || null,
       contacts: data.contact
         ? {
             create: {
@@ -142,28 +151,142 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
     },
   })
 
-  return res.status(201).json(company)
+  const followUp = plan.value
+    ? await createFollowUp(
+        { ...plan.value, companyId: company.id, contactId: company.contacts[0]?.id, assigneeId: req.user!.id },
+        req.user!.id
+      )
+    : null
+
+  return res.status(201).json({ ...company, followUp })
 })
 
 router.patch('/:id', requirePermission('customers.write'), async (req, res) => {
-  const company = await prisma.company.update({
-    where: { id: param(req, 'id') },
-    data: {
-      name: req.body.name,
-      website: req.body.website,
-      businessCategory: req.body.businessCategory,
-      leadStatus: req.body.leadStatus,
-      leadSource: req.body.leadSource,
-      notes: req.body.notes,
-      tags: req.body.tags,
-      assignedOfficerId: req.body.assignedOfficerId,
-      preferredContactMethod: req.body.preferredContactMethod,
-      callingHoursStart: req.body.callingHoursStart,
-      callingHoursEnd: req.body.callingHoursEnd,
-      timezone: req.body.timezone,
-    },
+  const parsed = companyUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid customer details', details: parsed.error.flatten() })
+  const { primaryContact, ...data } = parsed.data
+  const id = param(req, 'id')
+
+  const existing = await prisma.company.findUnique({ where: { id }, include: { contacts: true } })
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+  if (data.levelId && !(await prisma.customerLevel.findUnique({ where: { id: data.levelId } }))) {
+    return res.status(400).json({ error: 'Level not found' })
+  }
+
+  await prisma.company.update({ where: { id }, data })
+
+  if (primaryContact) {
+    const current = existing.contacts.find((c) => c.isPrimary) || existing.contacts[0]
+    const contactData = {
+      firstName: primaryContact.firstName ?? current?.firstName ?? '',
+      lastName: primaryContact.lastName ?? current?.lastName ?? '',
+      jobTitle: primaryContact.jobTitle,
+      email: primaryContact.email === undefined ? undefined : primaryContact.email || null,
+      mobile: primaryContact.mobile,
+      phone: primaryContact.phone,
+    }
+    if (current) {
+      await prisma.contact.update({ where: { id: current.id }, data: contactData })
+    } else if (Object.values(contactData).some(Boolean)) {
+      await prisma.contact.create({ data: { ...contactData, companyId: id, isPrimary: true } })
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: { userId: req.user!.id, action: 'company.update', entityType: 'Company', entityId: id, meta: asJson(parsed.data) },
+  })
+
+  const company = await prisma.company.findUnique({
+    where: { id },
+    include: { contacts: true, level: true, assignedOfficer: { select: { id: true, firstName: true, lastName: true } } },
   })
   return res.json(company)
+})
+
+function contactData(input: z.infer<typeof contactSchema>) {
+  return {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    jobTitle: input.jobTitle || null,
+    email: input.email || null,
+    mobile: input.mobile || null,
+    phone: input.phone || null,
+  }
+}
+
+router.post('/:id/contacts', requirePermission('customers.write'), async (req, res) => {
+  const parsed = contactSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const companyId = param(req, 'id')
+  const company = await prisma.company.findUnique({ where: { id: companyId }, include: { contacts: true } })
+  if (!company) return res.status(404).json({ error: 'Customer not found' })
+
+  const isPrimary = parsed.data.isPrimary || company.contacts.length === 0
+  const contact = await prisma.$transaction(async (tx) => {
+    if (isPrimary) await tx.contact.updateMany({ where: { companyId }, data: { isPrimary: false } })
+    return tx.contact.create({ data: { ...contactData(parsed.data), companyId, isPrimary } })
+  })
+  return res.status(201).json(contact)
+})
+
+router.patch('/:id/contacts/:contactId', requirePermission('customers.write'), async (req, res) => {
+  const parsed = contactSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const companyId = param(req, 'id')
+  const existing = await prisma.contact.findFirst({ where: { id: param(req, 'contactId'), companyId } })
+  if (!existing) return res.status(404).json({ error: 'Contact not found' })
+
+  const contact = await prisma.$transaction(async (tx) => {
+    if (parsed.data.isPrimary) await tx.contact.updateMany({ where: { companyId }, data: { isPrimary: false } })
+    return tx.contact.update({
+      where: { id: existing.id },
+      data: { ...contactData(parsed.data), isPrimary: parsed.data.isPrimary ?? existing.isPrimary },
+    })
+  })
+  return res.json(contact)
+})
+
+router.delete('/:id/contacts/:contactId', requirePermission('customers.write'), async (req, res) => {
+  const companyId = param(req, 'id')
+  const existing = await prisma.contact.findFirst({ where: { id: param(req, 'contactId'), companyId } })
+  if (!existing) return res.status(404).json({ error: 'Contact not found' })
+  const id = existing.id
+
+  await prisma.$transaction(async (tx) => {
+    const unlink = { where: { contactId: id }, data: { contactId: null } }
+    await tx.businessCard.updateMany(unlink)
+    await tx.visit.updateMany(unlink)
+    await tx.followUp.updateMany(unlink)
+    await tx.requirement.updateMany(unlink)
+    await tx.ticket.updateMany(unlink)
+    await tx.contact.delete({ where: { id } })
+    if (existing.isPrimary) {
+      const next = await tx.contact.findFirst({ where: { companyId }, orderBy: { createdAt: 'asc' } })
+      if (next) await tx.contact.update({ where: { id: next.id }, data: { isPrimary: true } })
+    }
+  })
+  return res.json({ ok: true })
+})
+
+router.delete('/:id', requirePermission('customers.delete'), async (req, res) => {
+  const id = param(req, 'id')
+  const existing = await prisma.company.findUnique({ where: { id } })
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+
+  await prisma.$transaction([
+    prisma.user.updateMany({ where: { companyId: id }, data: { companyId: null, isActive: false } }),
+    prisma.company.delete({ where: { id } }),
+  ])
+  await prisma.auditLog.create({
+    data: {
+      userId: req.user!.id,
+      action: 'company.delete',
+      entityType: 'Company',
+      entityId: id,
+      meta: { name: existing.name },
+    },
+  })
+  return res.json({ ok: true })
 })
 
 export default router

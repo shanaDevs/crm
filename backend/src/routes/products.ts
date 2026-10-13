@@ -1,7 +1,12 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
-import { opportunityCreateSchema, productCreateSchema } from '../validators/schemas'
+import {
+  opportunityCreateSchema,
+  opportunityUpdateSchema,
+  productCreateSchema,
+  productUpdateSchema,
+} from '../validators/schemas'
 import { param, asJson } from '../lib/http'
 
 const productsRouter = Router()
@@ -38,17 +43,32 @@ productsRouter.post('/', requirePermission('products.write'), async (req, res) =
 })
 
 productsRouter.patch('/:id', requirePermission('products.write'), async (req, res) => {
-  const product = await prisma.product.update({
-    where: { id: param(req, 'id') },
-    data: {
-      name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
-      isActive: req.body.isActive,
-      managerId: req.body.managerId,
-    },
-  })
+  const parsed = productUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const id = param(req, 'id')
+  if (!(await prisma.product.findUnique({ where: { id } }))) return res.status(404).json({ error: 'Product not found' })
+  const product = await prisma.product.update({ where: { id }, data: parsed.data })
   return res.json(product)
+})
+
+productsRouter.delete('/:id', requirePermission('products.write'), async (req, res) => {
+  const id = param(req, 'id')
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: { _count: { select: { opportunities: true, requirements: true, tickets: true } } },
+  })
+  if (!product) return res.status(404).json({ error: 'Product not found' })
+  const used = product._count.opportunities + product._count.requirements + product._count.tickets
+  if (used > 0) {
+    return res.status(400).json({
+      error: `"${product.name}" is used by ${product._count.opportunities} opportunities, ${product._count.requirements} requirements and ${product._count.tickets} tickets. Mark it inactive instead.`,
+    })
+  }
+  await prisma.$transaction([
+    prisma.followUp.updateMany({ where: { productId: id }, data: { productId: null } }),
+    prisma.product.delete({ where: { id } }),
+  ])
+  return res.json({ ok: true })
 })
 
 const opportunitiesRouter = Router()
@@ -106,6 +126,42 @@ opportunitiesRouter.patch('/:id/stage', requirePermission('opportunities.write')
     include: { stage: true },
   })
   return res.json(opportunity)
+})
+
+opportunitiesRouter.patch('/:id', requirePermission('opportunities.write'), async (req, res) => {
+  const parsed = opportunityUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { stageCode, expectedCloseDate, ...data } = parsed.data
+  const id = param(req, 'id')
+  if (!(await prisma.opportunity.findUnique({ where: { id } }))) {
+    return res.status(404).json({ error: 'Opportunity not found' })
+  }
+  let stageId: string | undefined
+  if (stageCode) {
+    const stage = await prisma.opportunityStage.findUnique({ where: { code: stageCode } })
+    if (!stage) return res.status(400).json({ error: 'Invalid stage' })
+    stageId = stage.id
+  }
+  const opportunity = await prisma.opportunity.update({
+    where: { id },
+    data: {
+      ...data,
+      stageId,
+      expectedCloseDate:
+        expectedCloseDate === undefined ? undefined : expectedCloseDate ? new Date(expectedCloseDate) : null,
+    },
+    include: { stage: true, product: true, company: true },
+  })
+  return res.json(opportunity)
+})
+
+opportunitiesRouter.delete('/:id', requirePermission('opportunities.write'), async (req, res) => {
+  const id = param(req, 'id')
+  if (!(await prisma.opportunity.findUnique({ where: { id } }))) {
+    return res.status(404).json({ error: 'Opportunity not found' })
+  }
+  await prisma.opportunity.delete({ where: { id } })
+  return res.json({ ok: true })
 })
 
 export { productsRouter, opportunitiesRouter }

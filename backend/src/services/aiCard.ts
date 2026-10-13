@@ -1,24 +1,24 @@
 import { z } from 'zod'
 
 export const cardExtractionSchema = z.object({
-  contactName: z.string().nullable(),
-  jobTitle: z.string().nullable(),
-  companyName: z.string().nullable(),
-  mobile: z.string().nullable(),
-  phone: z.string().nullable(),
-  email: z.string().nullable(),
-  website: z.string().nullable(),
-  address: z.string().nullable(),
+  contactName: z.string().nullish(),
+  jobTitle: z.string().nullish(),
+  companyName: z.string().nullish(),
+  mobile: z.string().nullish(),
+  phone: z.string().nullish(),
+  email: z.string().nullish(),
+  website: z.string().nullish(),
+  address: z.string().nullish(),
   socialProfiles: z
     .object({
       linkedin: z.string().nullable().optional(),
       twitter: z.string().nullable().optional(),
       other: z.string().nullable().optional(),
     })
-    .nullable(),
+    .nullish(),
   suggestedBusinessCategory: z.string().nullable().optional(),
   suggestedProductInterest: z.array(z.string()).nullable().optional(),
-  confidence: z.record(z.string(), z.number()).optional(),
+  confidence: z.record(z.string(), z.number()).nullish(),
 })
 
 export type CardExtraction = z.infer<typeof cardExtractionSchema>
@@ -94,7 +94,7 @@ async function extractWithGemini(imageBase64: string, mimeType: string, apiKey: 
   const model = process.env.AI_MODEL || 'gemini-3.6-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ async function extractWithGemini(imageBase64: string, mimeType: string, apiKey: 
 
 async function extractWithOpenAI(imageBase64: string, mimeType: string, apiKey: string) {
   const model = process.env.AI_MODEL || 'gpt-4o-mini'
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithRetry('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -165,10 +165,7 @@ async function extractWithOpenAI(imageBase64: string, mimeType: string, apiKey: 
         {
           role: 'user',
           content: [
-            {
-              type: 'text',
-              text: 'Extract: contactName, jobTitle, companyName, mobile, phone, email, website, address, socialProfiles{linkedin,twitter,other}, suggestedBusinessCategory, suggestedProductInterest[], confidence{field:0-1}',
-            },
+            { type: 'text', text: EXTRACTION_PROMPT },
             {
               type: 'image_url',
               image_url: { url: `data:${mimeType};base64,${imageBase64}` },
@@ -188,8 +185,20 @@ async function extractWithOpenAI(imageBase64: string, mimeType: string, apiKey: 
     choices: Array<{ message: { content: string } }>
   }
   const content = json.choices[0]?.message?.content || '{}'
-  const parsed = cardExtractionSchema.parse(JSON.parse(content))
+  const parsed = cardExtractionSchema.parse(parseJsonLoose(content))
   return { data: sanitizeExtraction(parsed), raw: json, mode: 'openai' as const }
+}
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(url, init)
+    if (response.ok || attempt >= attempts || !RETRYABLE_STATUS.has(response.status)) {
+      return response
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)))
+  }
 }
 
 function parseJsonLoose(text: string) {

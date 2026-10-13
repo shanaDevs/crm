@@ -23,6 +23,7 @@ export const companyCreateSchema = z.object({
   tags: z.array(z.string()).optional(),
   notes: z.string().optional().nullable(),
   assignedOfficerId: z.string().optional().nullable(),
+  levelId: z.string().optional().nullable(),
   interestedProductIds: z.array(z.string()).optional(),
   contact: z
     .object({
@@ -36,6 +37,40 @@ export const companyCreateSchema = z.object({
       linkedinUrl: z.string().optional().nullable(),
       twitterUrl: z.string().optional().nullable(),
       isPrimary: z.boolean().optional(),
+    })
+    .optional(),
+})
+
+const optionalText = z.string().trim().optional().nullable()
+
+export const companyUpdateSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  website: optionalText,
+  businessCategory: optionalText,
+  addressLine1: optionalText,
+  addressLine2: optionalText,
+  city: optionalText,
+  state: optionalText,
+  postalCode: optionalText,
+  country: optionalText,
+  leadSource: optionalText,
+  leadStatus: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'NURTURING', 'CONVERTED', 'LOST']).optional(),
+  preferredContactMethod: z.enum(['CALL', 'EMAIL', 'WHATSAPP', 'SMS', 'IN_PERSON']).optional().nullable(),
+  callingHoursStart: optionalText,
+  callingHoursEnd: optionalText,
+  timezone: z.string().trim().min(1).optional(),
+  tags: z.array(z.string()).optional(),
+  notes: optionalText,
+  assignedOfficerId: z.string().optional().nullable(),
+  levelId: z.string().optional().nullable(),
+  primaryContact: z
+    .object({
+      firstName: z.string().trim().optional(),
+      lastName: z.string().trim().optional(),
+      jobTitle: optionalText,
+      email: z.string().trim().email().optional().nullable().or(z.literal('')),
+      mobile: optionalText,
+      phone: optionalText,
     })
     .optional(),
 })
@@ -54,7 +89,18 @@ export const followUpCreateSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   notes: z.string().optional().nullable(),
   assigneeId: z.string(),
+  smsCustomer: z.boolean().default(false),
+  smsAssignee: z.boolean().default(false),
 })
+
+/** Follow-up scheduled while registering a customer; company, contact and assignee are filled in by the server. */
+export const followUpPlanSchema = followUpCreateSchema
+  .omit({ companyId: true, contactId: true, visitId: true, assigneeId: true })
+  .extend({ purpose: followUpCreateSchema.shape.purpose.default('INTRODUCTION') })
+  .refine((v) => new Date(v.scheduledAt).getTime() > Date.now() - 60_000, {
+    message: 'Follow-up time must be in the future',
+    path: ['scheduledAt'],
+  })
 
 export const callLogSchema = z.object({
   outcome: z.enum([
@@ -119,6 +165,9 @@ export const visitCreateSchema = z.object({
   contactId: z.string().optional().nullable(),
   visitedAt: z.string().datetime(),
   location: z.string().optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  saveAsCompanyAddress: z.boolean().optional(),
   notes: z.string().optional().nullable(),
   nextAction: z.string().optional().nullable(),
 })
@@ -130,4 +179,92 @@ export const productCreateSchema = z.object({
   isActive: z.boolean().optional(),
   managerId: z.string().optional().nullable(),
   teamMemberIds: z.array(z.string()).optional(),
+})
+
+// Update schemas list every field explicitly: zod 4 applies `.default()` even inside `.partial()`,
+// which would silently reset omitted fields such as priority.
+const priorityEnum = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+const nullableText = z.string().trim().optional().nullable()
+const nullableDate = z.string().datetime().optional().nullable()
+
+export const productUpdateSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  description: nullableText,
+  category: nullableText,
+  isActive: z.boolean().optional(),
+  managerId: z.string().optional().nullable(),
+})
+
+export const opportunityUpdateSchema = z.object({
+  companyId: z.string().optional(),
+  productId: z.string().optional(),
+  title: z.string().trim().min(1).optional(),
+  stageCode: opportunityCreateSchema.shape.stageCode.unwrap().optional(),
+  value: z.number().optional().nullable(),
+  currency: z.string().trim().min(1).optional(),
+  expectedCloseDate: nullableDate,
+  notes: nullableText,
+  ownerId: z.string().optional(),
+})
+
+export const requirementUpdateSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+  productId: z.string().optional(),
+  contactId: z.string().optional().nullable(),
+  businessProblem: nullableText,
+  expectedResult: nullableText,
+  category: nullableText,
+  priority: priorityEnum.optional(),
+  acceptanceCriteria: nullableText,
+  requestedDeliveryDate: nullableDate,
+})
+
+export const ticketUpdateSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+  productId: z.string().optional(),
+  contactId: z.string().optional().nullable(),
+  type: ticketCreateSchema.shape.type.optional(),
+  priority: priorityEnum.optional(),
+  dueDate: nullableDate,
+})
+
+export const visitUpdateSchema = z.object({
+  companyId: z.string().optional(),
+  contactId: z.string().optional().nullable(),
+  visitedAt: z.string().datetime().optional(),
+  location: nullableText,
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  saveAsCompanyAddress: z.boolean().optional(),
+  notes: nullableText,
+  nextAction: nullableText,
+})
+
+export const followUpUpdateSchema = z.object({
+  contactId: z.string().optional().nullable(),
+  productId: z.string().optional().nullable(),
+  activityType: followUpCreateSchema.shape.activityType.optional(),
+  purpose: followUpCreateSchema.shape.purpose.optional(),
+  customPurpose: nullableText,
+  scheduledAt: z.string().datetime().optional(),
+  timezone: z.string().optional(),
+  reminderMinutes: z.number().int().min(0).optional(),
+  priority: priorityEnum.optional(),
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED']).optional(),
+  notes: nullableText,
+  assigneeId: z.string().optional(),
+  smsCustomer: z.boolean().optional(),
+  smsAssignee: z.boolean().optional(),
+})
+
+export const contactSchema = z.object({
+  firstName: z.string().trim().min(1, 'Name is required'),
+  lastName: z.string().trim().optional().default(''),
+  jobTitle: nullableText,
+  email: z.string().trim().email().optional().nullable().or(z.literal('')),
+  mobile: nullableText,
+  phone: nullableText,
+  isPrimary: z.boolean().optional(),
 })

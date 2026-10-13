@@ -3,6 +3,7 @@ import { createSession, hashPassword, loadAuthUser, verifyPassword } from '../li
 import { prisma } from '../lib/prisma'
 import { loginSchema } from '../validators/schemas'
 import { requireAuth } from '../middleware/auth'
+import { normalizePhone } from '../services/sms'
 
 const router = Router()
 
@@ -52,6 +53,17 @@ router.get('/me', requireAuth, async (req, res) => {
   return res.json({ user: req.user })
 })
 
+router.patch('/me', requireAuth, async (req, res) => {
+  const raw = req.body?.phone
+  if (raw !== null && typeof raw !== 'string') return res.status(400).json({ error: 'phone must be a string or null' })
+  const phone = raw?.trim() || null
+  if (phone && !normalizePhone(phone)) {
+    return res.status(400).json({ error: 'Enter a valid mobile number, e.g. 0771234567' })
+  }
+  await prisma.user.update({ where: { id: req.user!.id }, data: { phone } })
+  return res.json({ user: await loadAuthUser(req.user!.id) })
+})
+
 router.post('/register-customer', requireAuth, async (req, res) => {
   // Staff can create a portal login for a company contact
   if (!req.user || req.user.roleCode === 'CUSTOMER') {
@@ -67,7 +79,7 @@ router.post('/register-customer', requireAuth, async (req, res) => {
   if (!email || !password || !firstName || !lastName || !companyId) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
-  const role = await prisma.role.findUnique({ where: { code: 'CUSTOMER' } })
+  const role = await prisma.role.findFirst({ where: { code: 'CUSTOMER' }, orderBy: { isSystem: 'desc' } })
   if (!role) return res.status(500).json({ error: 'Customer role missing' })
 
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } })

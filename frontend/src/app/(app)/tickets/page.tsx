@@ -1,119 +1,100 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
-import type { Company, Product, Ticket } from '@/lib/types'
+import type { Ticket } from '@/lib/types'
 import { statusLabel } from '@/lib/format'
 import { useAuth } from '@/lib/auth'
+import { TicketFormModal } from '@/components/TicketFormModal'
 import {
   Badge,
   Button,
   EmptyState,
   ErrorBanner,
-  Field,
-  Input,
   LoadingState,
-  Modal,
   PageHeader,
-  Select,
-  Textarea,
   priorityTone,
   statusTone,
 } from '@/components/ui'
 
-export default function TicketsPage() {
-  const { user, isCustomer } = useAuth()
+export default function TicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const query = use(searchParams)
+  const presetCompanyId = typeof query.companyId === 'string' ? query.companyId : ''
+  const { isCustomer, can } = useAuth()
+  const canWrite = can('tickets.write')
+  const canManage = can('tickets.manage')
   const [items, setItems] = useState<Ticket[]>([])
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    companyId: '',
-    productId: '',
-    type: 'SUPPORT',
-    priority: 'MEDIUM',
-  })
+  const [modal, setModal] = useState<{ ticket: Ticket | null } | null>(query.new ? { ticket: null } : null)
 
-  async function load() {
-    setLoading(true)
-    try {
-      const [tickets, comps, prods] = await Promise.all([
-        api<Ticket[]>('/api/tickets'),
-        api<Company[]>('/api/customers').catch(() => [] as Company[]),
-        api<Product[]>('/api/products'),
-      ])
-      setItems(tickets)
-      setCompanies(comps)
-      setProducts(prods)
-      if (user?.companyId) setForm((f) => ({ ...f, companyId: user.companyId || '' }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tickets')
-    } finally {
-      setLoading(false)
-    }
+  function load() {
+    return api<Ticket[]>('/api/tickets')
+      .then(setItems)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load tickets'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+  const canEdit = (ticket: Ticket) => canWrite && (!isCustomer || ticket.status === 'OPEN')
+
+  async function onDelete(ticket: Ticket) {
+    if (!window.confirm(`Delete ticket ${ticket.ticketNumber}: "${ticket.title}"?`)) return
+    setError(null)
     try {
-      await api('/api/tickets', {
-        method: 'POST',
-        body: {
-          title: form.title,
-          description: form.description,
-          companyId: form.companyId || user?.companyId,
-          productId: form.productId,
-          type: form.type,
-          priority: form.priority,
-        },
-      })
-      setOpen(false)
+      await api(`/api/tickets/${ticket.id}`, { method: 'DELETE' })
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create ticket')
-    } finally {
-      setSaving(false)
+      setError(err instanceof ApiError ? err.message : 'Failed to delete ticket')
     }
   }
+
+  const visible = presetCompanyId ? items.filter((t) => (t.companyId || t.company?.id) === presetCompanyId) : items
 
   return (
     <div>
       <PageHeader
         title="Tickets"
         description={isCustomer ? 'Support and change requests for your company.' : 'Bugs, support, and delivery tickets.'}
-        actions={<Button onClick={() => setOpen(true)}>New ticket</Button>}
+        actions={
+          <>
+            {presetCompanyId ? (
+              <Link href="/tickets">
+                <Button variant="secondary">Show all customers</Button>
+              </Link>
+            ) : null}
+            {canWrite ? <Button onClick={() => setModal({ ticket: null })}>New ticket</Button> : null}
+          </>
+        }
       />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
-      ) : items.length === 0 ? (
+      ) : visible.length === 0 ? (
         <EmptyState title="No tickets" />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-white shadow-sm">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-[var(--border)] bg-slate-50 text-xs uppercase text-[var(--muted)]">
               <tr>
                 <th className="px-4 py-3 font-medium">Ticket</th>
                 <th className="px-4 py-3 font-medium">Company</th>
-                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="hidden px-4 py-3 font-medium lg:table-cell">Type</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Priority</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Priority</th>
+                <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {items.map((ticket) => (
+              {visible.map((ticket) => (
                 <tr key={ticket.id} className="hover:bg-slate-50/80">
                   <td className="px-4 py-3">
                     <Link href={`/tickets/${ticket.id}`} className="font-medium hover:text-[var(--primary)]">
@@ -121,12 +102,31 @@ export default function TicketsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-[var(--muted)]">{ticket.company?.name}</td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{statusLabel(ticket.type)}</td>
+                  <td className="hidden px-4 py-3 text-[var(--muted)] lg:table-cell">{statusLabel(ticket.type)}</td>
                   <td className="px-4 py-3">
                     <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden px-4 py-3 md:table-cell">
                     <Badge tone={priorityTone(ticket.priority)}>{statusLabel(ticket.priority)}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <Link href={`/tickets/${ticket.id}`}>
+                        <Button size="sm" variant="secondary">
+                          View
+                        </Button>
+                      </Link>
+                      {canEdit(ticket) ? (
+                        <Button size="sm" variant="secondary" onClick={() => setModal({ ticket })}>
+                          Edit
+                        </Button>
+                      ) : null}
+                      {canManage ? (
+                        <Button size="sm" variant="danger" onClick={() => void onDelete(ticket)}>
+                          Delete
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -135,71 +135,17 @@ export default function TicketsPage() {
         </div>
       )}
 
-      <Modal open={open} title="New ticket" onClose={() => setOpen(false)}>
-        <form onSubmit={onCreate} className="space-y-3">
-          <Field label="Title">
-            <Input required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-          </Field>
-          <Field label="Description">
-            <Textarea
-              required
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            />
-          </Field>
-          {!isCustomer ? (
-            <Field label="Company">
-              <Select
-                required
-                value={form.companyId}
-                onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value }))}
-              >
-                <option value="">Select</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          ) : null}
-          <Field label="Product">
-            <Select
-              required
-              value={form.productId}
-              onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))}
-            >
-              <option value="">Select</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Type">
-            <Select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
-              {['BUG', 'SUPPORT', 'TASK', 'CHANGE_REQUEST'].map((t) => (
-                <option key={t} value={t}>
-                  {statusLabel(t)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Priority">
-            <Select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
-              {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => (
-                <option key={p} value={p}>
-                  {statusLabel(p)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? 'Saving…' : 'Create ticket'}
-          </Button>
-        </form>
-      </Modal>
+      {modal ? (
+        <TicketFormModal
+          ticket={modal.ticket}
+          presetCompanyId={presetCompanyId}
+          onClose={() => setModal(null)}
+          onSaved={() => {
+            setModal(null)
+            void load()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

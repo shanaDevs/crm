@@ -21,6 +21,7 @@ import {
   CalendarClock,
   MapPin,
   DoorOpen,
+  ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { fullName } from '@/lib/format'
@@ -29,6 +30,10 @@ type NavItem = {
   href: string
   label: string
   icon: ReactNode
+  /** Shown when the user holds this permission (CRM Admin holds all). */
+  permission?: string
+  /** Hidden from customer portal users even if their role has the permission. */
+  staffOnly?: boolean
   roles?: Array<'CRM_ADMIN' | 'IT_MANAGER' | 'MARKETING_OFFICER' | 'DEVELOPER' | 'CUSTOMER'>
 }
 
@@ -37,79 +42,92 @@ const NAV: NavItem[] = [
     href: '/dashboard',
     label: 'Dashboard',
     icon: <LayoutDashboard size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER', 'DEVELOPER'],
+    permission: 'dashboard.read',
+    staffOnly: true,
   },
   {
     href: '/customers',
     label: 'Customers',
     icon: <Building2 size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER'],
+    permission: 'customers.read',
+    staffOnly: true,
   },
   {
     href: '/scan',
     label: 'Scan Card',
     icon: <Camera size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'MARKETING_OFFICER'],
+    permission: 'customers.write',
+    staffOnly: true,
   },
   {
     href: '/visits',
     label: 'Visits',
     icon: <MapPin size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'MARKETING_OFFICER'],
+    permission: 'visits.read',
   },
   {
     href: '/follow-ups',
     label: 'Follow-ups',
     icon: <CalendarClock size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER'],
+    permission: 'followups.read',
   },
   {
     href: '/products',
     label: 'Products',
     icon: <Package size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER', 'DEVELOPER', 'CUSTOMER'],
+    permission: 'products.read',
   },
   {
     href: '/opportunities',
     label: 'Opportunities',
     icon: <Briefcase size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER'],
+    permission: 'opportunities.read',
   },
   {
     href: '/requirements',
     label: 'Requirements',
     icon: <ClipboardList size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER', 'DEVELOPER', 'CUSTOMER'],
+    permission: 'requirements.read',
   },
   {
     href: '/tickets',
     label: 'Tickets',
     icon: <Ticket size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER', 'DEVELOPER', 'CUSTOMER'],
+    permission: 'tickets.read',
   },
   {
     href: '/team',
     label: 'Team',
     icon: <Users size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER'],
+    permission: 'team.read',
+    staffOnly: true,
+  },
+  {
+    href: '/roles',
+    label: 'Roles & permissions',
+    icon: <ShieldCheck size={18} strokeWidth={2} />,
+    permission: 'roles.manage',
+    staffOnly: true,
   },
   {
     href: '/notifications',
     label: 'Notifications',
     icon: <Bell size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER', 'MARKETING_OFFICER', 'DEVELOPER', 'CUSTOMER'],
+    permission: 'notifications.read',
   },
   {
     href: '/reports',
     label: 'Reports',
     icon: <BarChart3 size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN', 'IT_MANAGER'],
+    permission: 'reports.read',
+    staffOnly: true,
   },
   {
     href: '/settings',
     label: 'Settings',
     icon: <Settings size={18} strokeWidth={2} />,
-    roles: ['CRM_ADMIN'],
+    permission: 'settings.read',
+    staffOnly: true,
   },
   {
     href: '/portal',
@@ -217,18 +235,17 @@ function SidebarPanel({
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, can } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  /** The mobile menu is open only on the page it was opened from, so navigating closes it. */
+  const [openOnPath, setOpenOnPath] = useState<string | null>(null)
+  const open = openOnPath === pathname
+  const setOpen = (value: boolean) => setOpenOnPath(value ? pathname : null)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
   }, [loading, user, router])
-
-  useEffect(() => {
-    setOpen(false)
-  }, [pathname])
 
   useEffect(() => {
     if (!open) return
@@ -241,7 +258,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onResize = () => {
-      if (window.matchMedia('(min-width: 1024px)').matches) setOpen(false)
+      if (window.matchMedia('(min-width: 1024px)').matches) setOpenOnPath(null)
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
@@ -256,10 +273,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const role = user.roleCode
-  const items = NAV.filter((item) => !item.roles || item.roles.includes(role))
+  const items = NAV.filter(
+    (item) =>
+      (!item.roles || item.roles.includes(role)) &&
+      (!item.permission || can(item.permission)) &&
+      !(item.staffOnly && role === 'CUSTOMER')
+  )
   const home = role === 'CUSTOMER' ? '/portal' : '/dashboard'
   const userName = fullName(user)
-  const roleLabel = user.roleCode.replaceAll('_', ' ')
+  const roleLabel = user.roleName || user.roleCode.replaceAll('_', ' ')
 
   async function signOut() {
     setOpen(false)

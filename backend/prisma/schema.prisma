@@ -149,15 +149,19 @@ enum AttachmentEntityType {
   DEVELOPMENT_TASK
 }
 
+/// `code` is the base access type that drives data scoping; custom roles reuse a staff code.
 model Role {
   id          String   @id @default(cuid())
-  code        RoleCode @unique
-  name        String
+  code        RoleCode
+  name        String   @unique
   description String?
+  isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   users       User[]
   permissions RolePermission[]
+
+  @@index([code])
 }
 
 model Permission {
@@ -168,6 +172,31 @@ model Permission {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   roles       RolePermission[]
+  userOverrides UserPermission[]
+}
+
+/// Per-user override on top of the role: granted=true adds, granted=false removes.
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  permissionId String
+  granted      Boolean
+  createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+}
+
+model CustomerLevel {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String    @default("#c9a227")
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  companies Company[]
 }
 
 model RolePermission {
@@ -220,6 +249,7 @@ model User {
   auditLogs          AuditLog[]
   activityHistory    ActivityHistory[]
   uploadedAttachments Attachment[] @relation("AttachmentUploader")
+  permissionOverrides UserPermission[]
 
   @@index([roleId])
   @@index([companyId])
@@ -260,9 +290,11 @@ model Company {
   tags                  String[]               @default([])
   notes                 String?
   assignedOfficerId     String?
+  levelId               String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   assignedOfficer       User?                  @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id])
+  level                 CustomerLevel?         @relation(fields: [levelId], references: [id], onDelete: SetNull)
   contacts              Contact[]
   businessCards         BusinessCard[]
   visits                Visit[]
@@ -277,6 +309,7 @@ model Company {
   @@index([name])
   @@index([leadStatus])
   @@index([assignedOfficerId])
+  @@index([levelId])
 }
 
 model Contact {
@@ -334,6 +367,8 @@ model Visit {
   contactId     String?
   visitedAt     DateTime
   location      String?
+  latitude      Float?
+  longitude     Float?
   notes         String?
   nextAction    String?
   createdById   String
@@ -450,6 +485,8 @@ model FollowUp {
   priority        Priority        @default(MEDIUM)
   status          ActivityStatus  @default(SCHEDULED)
   notes           String?
+  smsCustomer     Boolean         @default(false)
+  smsAssignee     Boolean         @default(false)
   assigneeId      String
   createdById     String
   parentFollowUpId String?
@@ -466,6 +503,7 @@ model FollowUp {
   callLogs        CallLog[]
   history         ActivityHistory[]
   reminderJobs    ReminderJob[]
+  smsMessages     SmsMessage[]
 
   @@index([companyId])
   @@index([assigneeId])
@@ -709,6 +747,22 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model SmsMessage {
+  id          String    @id @default(cuid())
+  followUpId  String?
+  recipient   String
+  body        String
+  /// SENT or FAILED
+  status      String
+  providerRef String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  followUp    FollowUp? @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+
+  @@index([followUpId])
+  @@index([createdAt])
 }
 
 model NotificationPreference {

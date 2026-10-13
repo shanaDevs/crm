@@ -15,6 +15,11 @@ import {
   PageHeader,
   Textarea,
 } from '@/components/ui'
+import {
+  FollowUpScheduler,
+  emptyFollowUpPlan,
+  followUpPlanPayload,
+} from '@/components/FollowUpScheduler'
 
 type Step = 'capture' | 'review'
 
@@ -31,14 +36,14 @@ export default function ScanPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [linkCompanyId, setLinkCompanyId] = useState<string>('')
+  const [followUp, setFollowUp] = useState(emptyFollowUpPlan)
   const [form, setForm] = useState({
     companyName: '',
     website: '',
     addressLine1: '',
     businessCategory: '',
     notes: '',
-    firstName: '',
-    lastName: '',
+    name: '',
     jobTitle: '',
     email: '',
     mobile: '',
@@ -51,15 +56,11 @@ export default function ScanPage() {
     api<Product[]>('/api/products').then(setProducts).catch(() => undefined)
   }, [])
 
-  useEffect(() => {
-    if (!front) {
-      setFrontPreview(null)
-      return
-    }
-    const url = URL.createObjectURL(front)
-    setFrontPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [front])
+  function chooseFront(file: File | null) {
+    if (frontPreview) URL.revokeObjectURL(frontPreview)
+    setFront(file)
+    setFrontPreview(file ? URL.createObjectURL(file) : null)
+  }
 
   async function onScan(e: FormEvent) {
     e.preventDefault()
@@ -80,18 +81,18 @@ export default function ScanPage() {
         companyName: x.companyName || '',
         website: x.website || '',
         addressLine1: x.address || '',
-        businessCategory: '',
+        businessCategory: x.suggestedBusinessCategory || '',
         notes: '',
-        firstName: x.firstName || '',
-        lastName: x.lastName || '',
+        name: x.contactName || '',
         jobTitle: x.jobTitle || '',
         email: x.email || '',
         mobile: x.mobile || '',
         phone: x.phone || '',
-        linkedinUrl: x.linkedinUrl || '',
-        twitterUrl: x.twitterUrl || '',
+        linkedinUrl: x.socialProfiles?.linkedin || '',
+        twitterUrl: x.socialProfiles?.twitter || '',
       })
       setLinkCompanyId('')
+      setFollowUp(emptyFollowUpPlan())
       setStep('review')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Scan failed')
@@ -121,8 +122,7 @@ export default function ScanPage() {
             notes: form.notes || undefined,
           },
           contact: {
-            firstName: form.firstName,
-            lastName: form.lastName,
+            name: form.name.trim() || undefined,
             jobTitle: form.jobTitle || undefined,
             email: form.email || undefined,
             mobile: form.mobile || undefined,
@@ -131,6 +131,7 @@ export default function ScanPage() {
             linkedinUrl: form.linkedinUrl || undefined,
             twitterUrl: form.twitterUrl || undefined,
           },
+          followUp: followUpPlanPayload(followUp, form.mobile || form.phone),
         },
       })
       router.push(`/customers/${result.id}`)
@@ -162,7 +163,7 @@ export default function ScanPage() {
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setFront(e.target.files?.[0] || null)}
+                  onChange={(e) => chooseFront(e.target.files?.[0] || null)}
                   required
                 />
               </Field>
@@ -242,11 +243,8 @@ export default function ScanPage() {
 
           <Card title="Contact">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="First name">
-                <Input required value={form.firstName} onChange={(e) => update('firstName', e.target.value)} />
-              </Field>
-              <Field label="Last name">
-                <Input required value={form.lastName} onChange={(e) => update('lastName', e.target.value)} />
+              <Field label="Name">
+                <Input value={form.name} onChange={(e) => update('name', e.target.value)} />
               </Field>
               <Field label="Job title">
                 <Input value={form.jobTitle} onChange={(e) => update('jobTitle', e.target.value)} />
@@ -288,6 +286,8 @@ export default function ScanPage() {
               })}
             </div>
           </Card>
+
+          <FollowUpScheduler value={followUp} onChange={setFollowUp} customerMobile={form.mobile || form.phone} />
 
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : linkCompanyId ? 'Link to selected company' : 'Create customer'}

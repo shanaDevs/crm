@@ -83,8 +83,23 @@ export async function uploadPrivateFile(
   mimeType: string,
   folder = 'uploads'
 ) {
-  const prefix = process.env.DO_SPACES_FOLDER_PREFIX || 'crmtool/'
-  const key = `${prefix}${folder}/${randomUUID()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+  const key = `${folderPrefix()}${folder}/${randomUUID()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+  return putPrivateObject(key, buffer, mimeType, fileName)
+}
+
+/** Writes JSON to a fixed key under the folder prefix, replacing any existing object. */
+export async function savePrivateJson(relativeKey: string, data: unknown) {
+  const key = `${folderPrefix()}${relativeKey}`
+  const buffer = Buffer.from(JSON.stringify(data, null, 2), 'utf8')
+  return putPrivateObject(key, buffer, 'application/json', relativeKey.split('/').pop() || 'data.json')
+}
+
+function folderPrefix() {
+  const prefix = (process.env.DO_SPACES_FOLDER_PREFIX ?? 'crmtool/').trim().replace(/^\/+/, '')
+  return prefix && !prefix.endsWith('/') ? `${prefix}/` : prefix
+}
+
+async function putPrivateObject(key: string, buffer: Buffer, mimeType: string, fileName: string) {
   const client = getClient()
 
   if (!client) {

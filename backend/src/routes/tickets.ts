@@ -3,15 +3,20 @@ import { CommentVisibility, RoleCode, TicketStatus } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { notifyUser } from '../services/notifications'
-import { ticketCreateSchema } from '../validators/schemas'
+import { ticketCreateSchema, ticketUpdateSchema } from '../validators/schemas'
 import { param, asJson } from '../lib/http'
 
 const router = Router()
 router.use(requireAuth)
 
 async function nextTicketNumber() {
-  const count = await prisma.ticket.count()
-  return `TCK-${String(count + 1).padStart(5, '0')}`
+  const last = await prisma.ticket.findFirst({
+    where: { ticketNumber: { startsWith: 'TCK-' } },
+    orderBy: { ticketNumber: 'desc' },
+    select: { ticketNumber: true },
+  })
+  const lastNumber = Number(last?.ticketNumber.slice(4)) || 0
+  return `TCK-${String(lastNumber + 1).padStart(5, '0')}`
 }
 
 router.get('/', requirePermission('tickets.read'), async (req, res) => {
@@ -101,6 +106,34 @@ router.get('/:id', requirePermission('tickets.read'), async (req, res) => {
     })
   }
   return res.json(ticket)
+})
+
+router.patch('/:id', requirePermission('tickets.write'), async (req, res) => {
+  const parsed = ticketUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const existing = await prisma.ticket.findUnique({ where: { id: param(req, 'id') } })
+  if (!existing) return res.status(404).json({ error: 'Ticket not found' })
+
+  if (req.user?.roleCode === RoleCode.CUSTOMER) {
+    if (req.user.companyId !== existing.companyId) return res.status(403).json({ error: 'Forbidden' })
+    if (existing.status !== TicketStatus.OPEN) {
+      return res.status(400).json({ error: 'This ticket is already being handled and can no longer be edited' })
+    }
+  }
+
+  const { dueDate, ...data } = parsed.data
+  const ticket = await prisma.ticket.update({
+    where: { id: existing.id },
+    data: { ...data, dueDate: dueDate === undefined ? undefined : dueDate ? new Date(dueDate) : null },
+  })
+  return res.json(ticket)
+})
+
+router.delete('/:id', requirePermission('tickets.manage'), async (req, res) => {
+  const id = param(req, 'id')
+  if (!(await prisma.ticket.findUnique({ where: { id } }))) return res.status(404).json({ error: 'Ticket not found' })
+  await prisma.ticket.delete({ where: { id } })
+  return res.json({ ok: true })
 })
 
 router.patch('/:id/assign', requirePermission('tickets.manage'), async (req, res) => {

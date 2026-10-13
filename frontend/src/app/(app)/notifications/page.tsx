@@ -20,20 +20,17 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function load() {
-    setLoading(true)
-    try {
-      const [list, preferences] = await Promise.all([
-        api<NotificationItem[]>('/api/notifications'),
-        api<Record<string, unknown> | null>('/api/notifications/preferences'),
-      ])
-      setItems(list)
-      setPrefs(preferences)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load notifications')
-    } finally {
-      setLoading(false)
-    }
+  function load() {
+    return Promise.all([
+      api<NotificationItem[]>('/api/notifications'),
+      api<Record<string, unknown> | null>('/api/notifications/preferences'),
+    ])
+      .then(([list, preferences]) => {
+        setItems(list)
+        setPrefs(preferences)
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load notifications'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -41,13 +38,21 @@ export default function NotificationsPage() {
   }, [])
 
   async function markAllRead() {
-    await api('/api/notifications/read-all', { method: 'POST' })
-    await load()
+    try {
+      await api('/api/notifications/read-all', { method: 'POST' })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark notifications read')
+    }
   }
 
   async function markRead(id: string) {
-    await api(`/api/notifications/${id}/read`, { method: 'PATCH' })
-    await load()
+    try {
+      await api(`/api/notifications/${id}/read`, { method: 'PATCH' })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark notification read')
+    }
   }
 
   if (loading) return <LoadingState />

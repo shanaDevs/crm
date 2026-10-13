@@ -3,7 +3,7 @@ import { CommentVisibility, RequirementStatus, RoleCode } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { notifyUser } from '../services/notifications'
-import { requirementCreateSchema } from '../validators/schemas'
+import { requirementCreateSchema, requirementUpdateSchema } from '../validators/schemas'
 import { param, asJson } from '../lib/http'
 
 const router = Router()
@@ -97,6 +97,58 @@ router.get('/:id', requirePermission('requirements.read'), async (req, res) => {
     })
   }
   return res.json(item)
+})
+
+const CUSTOMER_EDITABLE: RequirementStatus[] = [RequirementStatus.SUBMITTED, RequirementStatus.NEEDS_CLARIFICATION]
+
+router.patch('/:id', requirePermission('requirements.write'), async (req, res) => {
+  const parsed = requirementUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const existing = await prisma.requirement.findUnique({ where: { id: param(req, 'id') } })
+  if (!existing) return res.status(404).json({ error: 'Requirement not found' })
+
+  if (req.user?.roleCode === RoleCode.CUSTOMER) {
+    if (req.user.companyId !== existing.companyId) return res.status(403).json({ error: 'Forbidden' })
+    if (!CUSTOMER_EDITABLE.includes(existing.status)) {
+      return res.status(400).json({ error: 'This requirement is already being worked on and can no longer be edited' })
+    }
+  }
+
+  const { requestedDeliveryDate, ...data } = parsed.data
+  const updated = await prisma.requirement.update({
+    where: { id: existing.id },
+    data: {
+      ...data,
+      requestedDeliveryDate:
+        requestedDeliveryDate === undefined ? undefined : requestedDeliveryDate ? new Date(requestedDeliveryDate) : null,
+    },
+  })
+
+  const lastRev = await prisma.requirementRevision.findFirst({
+    where: { requirementId: updated.id },
+    orderBy: { version: 'desc' },
+  })
+  await prisma.requirementRevision.create({
+    data: {
+      requirementId: updated.id,
+      version: (lastRev?.version || 0) + 1,
+      snapshot: updated,
+      changeNote: 'Details edited',
+    },
+  })
+  return res.json(updated)
+})
+
+router.delete('/:id', requirePermission('requirements.manage'), async (req, res) => {
+  const id = param(req, 'id')
+  if (!(await prisma.requirement.findUnique({ where: { id } }))) {
+    return res.status(404).json({ error: 'Requirement not found' })
+  }
+  await prisma.$transaction([
+    prisma.ticket.updateMany({ where: { requirementId: id }, data: { requirementId: null } }),
+    prisma.requirement.delete({ where: { id } }),
+  ])
+  return res.json({ ok: true })
 })
 
 router.patch('/:id/status', requirePermission('requirements.manage'), async (req, res) => {

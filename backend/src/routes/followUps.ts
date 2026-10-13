@@ -2,9 +2,9 @@ import { Router } from 'express'
 import { ActivityStatus, RoleCode } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
-import { scheduleReminder } from '../services/reminders'
-import { callLogSchema, followUpCreateSchema } from '../validators/schemas'
-import { notifyUser } from '../services/notifications'
+import { cancelReminders, scheduleReminder } from '../services/reminders'
+import { callLogSchema, followUpCreateSchema, followUpUpdateSchema } from '../validators/schemas'
+import { createFollowUp } from '../services/followUps'
 import { param, asJson } from '../lib/http'
 
 const router = Router()
@@ -57,47 +57,7 @@ router.get('/', requirePermission('followups.read'), async (req, res) => {
 router.post('/', requirePermission('followups.write'), async (req, res) => {
   const parsed = followUpCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
-  const data = parsed.data
-
-  const followUp = await prisma.followUp.create({
-    data: {
-      companyId: data.companyId,
-      contactId: data.contactId,
-      productId: data.productId,
-      visitId: data.visitId,
-      activityType: data.activityType,
-      purpose: data.purpose,
-      customPurpose: data.customPurpose,
-      scheduledAt: new Date(data.scheduledAt),
-      timezone: data.timezone,
-      reminderMinutes: data.reminderMinutes,
-      priority: data.priority,
-      notes: data.notes,
-      assigneeId: data.assigneeId,
-      createdById: req.user!.id,
-    },
-  })
-
-  await prisma.activityHistory.create({
-    data: {
-      followUpId: followUp.id,
-      changedById: req.user!.id,
-      changeType: 'created',
-      toValue: { scheduledAt: followUp.scheduledAt, status: followUp.status },
-    },
-  })
-
-  await scheduleReminder(followUp.id, followUp.scheduledAt, followUp.reminderMinutes)
-
-  if (data.assigneeId !== req.user!.id) {
-    await notifyUser({
-      userId: data.assigneeId,
-      title: 'New activity assigned',
-      body: `You have been assigned a ${data.activityType.toLowerCase()}.`,
-      linkUrl: `/follow-ups/${followUp.id}`,
-    })
-  }
-
+  const followUp = await createFollowUp(parsed.data, req.user!.id)
   return res.status(201).json(followUp)
 })
 
@@ -118,6 +78,58 @@ router.get('/:id', requirePermission('followups.read'), async (req, res) => {
   })
   if (!item) return res.status(404).json({ error: 'Not found' })
   return res.json(item)
+})
+
+router.patch('/:id', requirePermission('followups.write'), async (req, res) => {
+  const parsed = followUpUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { scheduledAt, status, ...data } = parsed.data
+  const existing = await prisma.followUp.findUnique({ where: { id: param(req, 'id') } })
+  if (!existing) return res.status(404).json({ error: 'Follow-up not found' })
+
+  const nextScheduledAt = scheduledAt ? new Date(scheduledAt) : existing.scheduledAt
+  let nextStatus: ActivityStatus = status ?? existing.status
+  if (!status && existing.status === ActivityStatus.OVERDUE && nextScheduledAt > new Date()) {
+    nextStatus = ActivityStatus.SCHEDULED
+  }
+
+  const updated = await prisma.followUp.update({
+    where: { id: existing.id },
+    data: { ...data, scheduledAt: nextScheduledAt, status: nextStatus },
+  })
+
+  await prisma.activityHistory.create({
+    data: {
+      followUpId: existing.id,
+      changedById: req.user!.id,
+      changeType: 'updated',
+      fromValue: { scheduledAt: existing.scheduledAt, status: existing.status },
+      toValue: { scheduledAt: updated.scheduledAt, status: updated.status },
+    },
+  })
+
+  const isOpen = (s: ActivityStatus) => s === ActivityStatus.SCHEDULED || s === ActivityStatus.OVERDUE
+  const timingChanged =
+    updated.scheduledAt.getTime() !== existing.scheduledAt.getTime() ||
+    updated.reminderMinutes !== existing.reminderMinutes ||
+    isOpen(updated.status) !== isOpen(existing.status)
+  if (!isOpen(updated.status)) {
+    await cancelReminders(updated.id)
+  } else if (timingChanged) {
+    await scheduleReminder(updated.id, updated.scheduledAt, updated.reminderMinutes)
+  }
+  return res.json(updated)
+})
+
+router.delete('/:id', requirePermission('followups.write'), async (req, res) => {
+  const id = param(req, 'id')
+  const existing = await prisma.followUp.findUnique({ where: { id } })
+  if (!existing) return res.status(404).json({ error: 'Follow-up not found' })
+  await prisma.$transaction([
+    prisma.followUp.updateMany({ where: { parentFollowUpId: id }, data: { parentFollowUpId: null } }),
+    prisma.followUp.delete({ where: { id } }),
+  ])
+  return res.json({ ok: true })
 })
 
 router.post('/:id/reschedule', requirePermission('followups.write'), async (req, res) => {
@@ -148,6 +160,8 @@ router.post('/:id/reschedule', requirePermission('followups.write'), async (req,
       reminderMinutes: req.body.reminderMinutes ?? original.reminderMinutes,
       priority: original.priority,
       notes: req.body.notes || original.notes,
+      smsCustomer: original.smsCustomer,
+      smsAssignee: original.smsAssignee,
       assigneeId: req.body.assigneeId || original.assigneeId,
       createdById: req.user!.id,
       parentFollowUpId: original.id,
@@ -216,6 +230,8 @@ router.post('/:id/log-call', requirePermission('followups.write'), async (req, r
         reminderMinutes: n.reminderMinutes,
         priority: n.priority,
         notes: n.notes,
+        smsCustomer: n.smsCustomer,
+        smsAssignee: n.smsAssignee,
         assigneeId: n.assigneeId,
         createdById: req.user!.id,
         parentFollowUpId: followUp.id,

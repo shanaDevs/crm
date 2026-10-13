@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import { CUSTOMER_EDITABLE_REQUIREMENT, RequirementFormModal } from '@/components/RequirementFormModal'
 import { api, ApiError } from '@/lib/api'
 import type { Requirement, TeamMember } from '@/lib/types'
 import { formatDateTime, fullName, statusLabel } from '@/lib/format'
@@ -38,7 +39,10 @@ const STATUSES = [
 
 export default function RequirementDetailPage() {
   const params = useParams<{ id: string }>()
-  const { canManage, isCustomer } = useAuth()
+  const router = useRouter()
+  const { can, isCustomer } = useAuth()
+  const canManage = can('requirements.manage')
+  const [editing, setEditing] = useState(false)
   const [item, setItem] = useState<Requirement | null>(null)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [status, setStatus] = useState('')
@@ -49,23 +53,20 @@ export default function RequirementDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  async function load() {
-    if (!params.id) return
-    setLoading(true)
-    try {
-      const req = await api<Requirement>(`/api/requirements/${params.id}`)
-      setItem(req)
-      setStatus(req.status)
-      setAssigneeIds(req.assignments?.filter((a) => !a.unassignedAt).map((a) => a.userId) || [])
-      if (canManage) {
-        const users = await api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[])
-        setTeam(users.filter((u) => u.role.code === 'DEVELOPER' || u.role.code === 'IT_MANAGER'))
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load requirement')
-    } finally {
-      setLoading(false)
-    }
+  function load() {
+    if (!params.id) return Promise.resolve()
+    return api<Requirement>(`/api/requirements/${params.id}`)
+      .then(async (req) => {
+        setItem(req)
+        setStatus(req.status)
+        setAssigneeIds(req.assignments?.filter((a) => !a.unassignedAt).map((a) => a.userId) || [])
+        if (canManage) {
+          const users = await api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[])
+          setTeam(users.filter((u) => u.role.code === 'DEVELOPER' || u.role.code === 'IT_MANAGER'))
+        }
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load requirement'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -123,9 +124,23 @@ export default function RequirementDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!item || !window.confirm(`Delete requirement "${item.title}"? Its comments and tasks are deleted too.`)) return
+    setSaving(true)
+    try {
+      await api(`/api/requirements/${item.id}`, { method: 'DELETE' })
+      router.push('/requirements')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete requirement')
+      setSaving(false)
+    }
+  }
+
   if (loading) return <LoadingState />
   if (error && !item) return <ErrorBanner message={error} />
   if (!item) return null
+
+  const canEdit = can('requirements.write') && (!isCustomer || CUSTOMER_EDITABLE_REQUIREMENT.includes(item.status))
 
   return (
     <div>
@@ -133,13 +148,33 @@ export default function RequirementDetailPage() {
         title={item.title}
         description={`${item.company?.name || ''} · ${item.product?.name || ''}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge>
             <Badge tone={priorityTone(item.priority)}>{statusLabel(item.priority)}</Badge>
+            {canEdit ? (
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            ) : null}
+            {canManage ? (
+              <Button size="sm" variant="danger" onClick={() => void onDelete()} disabled={saving}>
+                Delete
+              </Button>
+            ) : null}
           </div>
         }
       />
       <ErrorBanner message={error} />
+      {editing ? (
+        <RequirementFormModal
+          requirement={item}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            void load()
+          }}
+        />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Details" className="lg:col-span-2">
@@ -155,6 +190,17 @@ export default function RequirementDetailPage() {
               <p className="text-xs font-medium uppercase text-[var(--muted)]">Expected result</p>
               <p className="mt-1 text-sm whitespace-pre-wrap">{item.expectedResult}</p>
             </div>
+          ) : null}
+          {item.acceptanceCriteria ? (
+            <div className="mt-4">
+              <p className="text-xs font-medium uppercase text-[var(--muted)]">Acceptance criteria</p>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{item.acceptanceCriteria}</p>
+            </div>
+          ) : null}
+          {item.requestedDeliveryDate ? (
+            <p className="mt-4 text-xs text-[var(--muted)]">
+              Requested delivery: {new Date(item.requestedDeliveryDate).toLocaleDateString()}
+            </p>
           ) : null}
         </Card>
 

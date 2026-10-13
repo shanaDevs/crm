@@ -4,12 +4,17 @@ import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { Button, Card, ErrorBanner, Field, Input, PageHeader, Select, Textarea } from '@/components/ui'
+import { LevelSelect, useCustomerLevels } from '@/components/levels'
+import { FollowUpScheduler, emptyFollowUpPlan, followUpPlanPayload } from '@/components/FollowUpScheduler'
 
 export default function NewCustomerPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const { levels } = useCustomerLevels()
+  const [followUp, setFollowUp] = useState(emptyFollowUpPlan)
   const [form, setForm] = useState({
+    levelId: null as string | null,
     name: '',
     website: '',
     businessCategory: '',
@@ -45,6 +50,7 @@ export default function NewCustomerPage() {
           city: form.city || null,
           country: form.country || null,
           leadSource: form.leadSource || null,
+          levelId: form.levelId,
           notes: form.notes || null,
           contact: {
             firstName: form.firstName,
@@ -55,6 +61,7 @@ export default function NewCustomerPage() {
             phone: form.phone || null,
             isPrimary: true,
           },
+          followUp: followUpPlanPayload(followUp, form.mobile || form.phone),
         },
       })
       router.push(`/customers/${company.id}`)
@@ -74,6 +81,9 @@ export default function NewCustomerPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Company name">
               <Input required value={form.name} onChange={(e) => update('name', e.target.value)} />
+            </Field>
+            <Field label="Level">
+              <LevelSelect levels={levels} value={form.levelId} onChange={(id) => update('levelId', id)} />
             </Field>
             <Field label="Website">
               <Input value={form.website} onChange={(e) => update('website', e.target.value)} />
@@ -126,6 +136,7 @@ export default function NewCustomerPage() {
             </Field>
           </div>
         </Card>
+        <FollowUpScheduler value={followUp} onChange={setFollowUp} customerMobile={form.mobile || form.phone} />
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Create customer'}

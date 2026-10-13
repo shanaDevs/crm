@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import { TicketFormModal } from '@/components/TicketFormModal'
 import { api, ApiError } from '@/lib/api'
 import type { TeamMember, Ticket } from '@/lib/types'
 import { formatDateTime, fullName, statusLabel } from '@/lib/format'
@@ -25,7 +26,10 @@ const STATUSES = ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'WAITING_INTERNAL',
 
 export default function TicketDetailPage() {
   const params = useParams<{ id: string }>()
-  const { canManage, isCustomer } = useAuth()
+  const router = useRouter()
+  const { can, isCustomer } = useAuth()
+  const canManage = can('tickets.manage')
+  const [editing, setEditing] = useState(false)
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [status, setStatus] = useState('')
@@ -36,23 +40,20 @@ export default function TicketDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  async function load() {
-    if (!params.id) return
-    setLoading(true)
-    try {
-      const data = await api<Ticket>(`/api/tickets/${params.id}`)
-      setTicket(data)
-      setStatus(data.status)
-      setAssigneeId(data.assignee?.id || '')
-      if (canManage) {
-        const users = await api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[])
-        setTeam(users)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load ticket')
-    } finally {
-      setLoading(false)
-    }
+  function load() {
+    if (!params.id) return Promise.resolve()
+    return api<Ticket>(`/api/tickets/${params.id}`)
+      .then(async (data) => {
+        setTicket(data)
+        setStatus(data.status)
+        setAssigneeId(data.assignee?.id || '')
+        if (canManage) {
+          const users = await api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[])
+          setTeam(users.filter((u) => u.isActive && u.role.code !== 'CUSTOMER'))
+        }
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load ticket'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -107,9 +108,23 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!ticket || !window.confirm(`Delete ticket ${ticket.ticketNumber}: "${ticket.title}"?`)) return
+    setSaving(true)
+    try {
+      await api(`/api/tickets/${ticket.id}`, { method: 'DELETE' })
+      router.push('/tickets')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete ticket')
+      setSaving(false)
+    }
+  }
+
   if (loading) return <LoadingState />
   if (error && !ticket) return <ErrorBanner message={error} />
   if (!ticket) return null
+
+  const canEdit = can('tickets.write') && (!isCustomer || ticket.status === 'OPEN')
 
   return (
     <div>
@@ -117,18 +132,41 @@ export default function TicketDetailPage() {
         title={`${ticket.ticketNumber}: ${ticket.title}`}
         description={`${ticket.company?.name || ''} · ${ticket.product?.name || ''} · ${statusLabel(ticket.type)}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
             <Badge tone={priorityTone(ticket.priority)}>{statusLabel(ticket.priority)}</Badge>
+            {canEdit ? (
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            ) : null}
+            {canManage ? (
+              <Button size="sm" variant="danger" onClick={() => void onDelete()} disabled={saving}>
+                Delete
+              </Button>
+            ) : null}
           </div>
         }
       />
       <ErrorBanner message={error} />
+      {editing ? (
+        <TicketFormModal
+          ticket={ticket}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            void load()
+          }}
+        />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Description" className="lg:col-span-2">
           <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
-          <p className="mt-4 text-xs text-[var(--muted)]">Assignee: {fullName(ticket.assignee)}</p>
+          <p className="mt-4 text-xs text-[var(--muted)]">
+            Assignee: {fullName(ticket.assignee)}
+            {ticket.dueDate ? ` · Due ${new Date(ticket.dueDate).toLocaleDateString()}` : ''}
+          </p>
         </Card>
 
         <Card title="Manage">

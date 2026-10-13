@@ -226,6 +226,20 @@ settingsRouter.post('/test-spaces', requirePermission('settings.write'), async (
   return res.json(await testSpacesConnection())
 })
 
+settingsRouter.get('/sms-status', requirePermission('settings.read'), async (_req, res) => {
+  const { smsAccountStatus, smsStatus } = await import('../services/sms')
+  const status = smsStatus()
+  return res.json({ ...status, account: status.configured ? await smsAccountStatus() : null })
+})
+
+settingsRouter.post('/test-sms', requirePermission('settings.write'), async (req, res) => {
+  const { normalizePhone, sendSms } = await import('../services/sms')
+  const to = typeof req.body?.to === 'string' ? req.body.to : ''
+  if (!normalizePhone(to)) return res.status(400).json({ error: 'Enter a valid mobile number, e.g. 0771234567' })
+  const result = await sendSms(to, 'Test message from CRM Tool. SMS reminders are working.')
+  return res.json(result.ok ? { ok: true, message: `Sent to ${result.to}` } : { ok: false, message: result.error })
+})
+
 settingsRouter.get('/ai-status', requirePermission('settings.read'), async (_req, res) => {
   const provider = (process.env.AI_PROVIDER || 'mock').toLowerCase()
   const hasKey = Boolean(process.env.AI_API_KEY?.trim())

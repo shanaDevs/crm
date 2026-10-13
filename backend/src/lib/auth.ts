@@ -12,7 +12,10 @@ export type AuthUser = {
   email: string
   firstName: string
   lastName: string
+  phone: string | null
   roleCode: RoleCode
+  roleId: string
+  roleName: string
   companyId: string | null
   timezone: string
   permissions: string[]
@@ -62,6 +65,7 @@ export async function loadAuthUser(userId: string): Promise<AuthUser | null> {
           permissions: { include: { permission: true } },
         },
       },
+      permissionOverrides: { include: { permission: true } },
     },
   })
   if (!user || !user.isActive) return null
@@ -70,11 +74,26 @@ export async function loadAuthUser(userId: string): Promise<AuthUser | null> {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+    phone: user.phone,
     roleCode: user.role.code,
+    roleId: user.role.id,
+    roleName: user.role.name,
     companyId: user.companyId,
     timezone: user.timezone,
-    permissions: user.role.permissions.map((rp) => rp.permission.code),
+    permissions: effectivePermissions(
+      user.role.permissions.map((rp) => rp.permission.code),
+      user.permissionOverrides.map((o) => ({ code: o.permission.code, granted: o.granted }))
+    ),
   }
+}
+
+export function effectivePermissions(rolePermissions: string[], overrides: Array<{ code: string; granted: boolean }>) {
+  const set = new Set(rolePermissions)
+  for (const o of overrides) {
+    if (o.granted) set.add(o.code)
+    else set.delete(o.code)
+  }
+  return Array.from(set)
 }
 
 export function hasPermission(user: AuthUser, permission: string) {

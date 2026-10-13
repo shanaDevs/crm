@@ -10,9 +10,62 @@ export type AuthUser = {
   email: string
   firstName: string
   lastName: string
+  phone: string | null
   roleCode: RoleCode
+  roleId: string
+  roleName: string
   companyId: string | null
   timezone: string
+  permissions: string[]
+}
+
+export type CustomerLevel = {
+  id: string
+  name: string
+  color: string
+  sortOrder: number
+  _count?: { companies: number }
+}
+
+export type BusinessCard = {
+  id: string
+  frontImageKey: string
+  backImageKey?: string | null
+  extractedData?: Record<string, unknown> | null
+  reviewed: boolean
+  createdAt: string
+}
+
+export type PermissionInfo = {
+  code: string
+  name: string
+  group: string
+  grantable: boolean
+}
+
+export type Role = {
+  id: string
+  name: string
+  code: RoleCode
+  description?: string | null
+  isSystem: boolean
+  userCount: number
+  permissions: string[]
+}
+
+export type PermissionOverride = { code: string; granted: boolean }
+
+export type ManagedUser = {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string | null
+  timezone: string
+  isActive: boolean
+  role: { id: string; code: RoleCode; name: string; isSystem: boolean }
+  rolePermissions: string[]
+  overrides: PermissionOverride[]
   permissions: string[]
 }
 
@@ -22,12 +75,17 @@ export type Company = {
   website?: string | null
   businessCategory?: string | null
   addressLine1?: string | null
+  addressLine2?: string | null
   city?: string | null
   state?: string | null
+  postalCode?: string | null
   country?: string | null
   leadStatus?: string
   leadSource?: string | null
   notes?: string | null
+  levelId?: string | null
+  level?: CustomerLevel | null
+  businessCards?: BusinessCard[]
   assignedOfficer?: { id: string; firstName: string; lastName: string } | null
   contacts?: Contact[]
   interestedProducts?: { product: Product }[]
@@ -65,6 +123,11 @@ export type Product = {
 
 export type FollowUp = {
   id: string
+  companyId?: string
+  contactId?: string | null
+  assigneeId?: string
+  reminderMinutes?: number
+  timezone?: string
   activityType: string
   purpose: string
   customPurpose?: string | null
@@ -72,6 +135,8 @@ export type FollowUp = {
   status: string
   priority: string
   notes?: string | null
+  smsCustomer?: boolean
+  smsAssignee?: boolean
   company?: Company
   contact?: Contact | null
   product?: Product | null
@@ -89,8 +154,12 @@ export type CallLog = {
 
 export type Visit = {
   id: string
+  companyId?: string
+  contactId?: string | null
   visitedAt: string
   location?: string | null
+  latitude?: number | null
+  longitude?: number | null
   notes?: string | null
   nextAction?: string | null
   company?: Company
@@ -109,6 +178,8 @@ export type OpportunityStage = {
 
 export type Opportunity = {
   id: string
+  companyId?: string
+  productId?: string
   title: string
   value?: number | null
   currency?: string
@@ -122,10 +193,14 @@ export type Opportunity = {
 
 export type Requirement = {
   id: string
+  companyId?: string
+  productId?: string
   title: string
   description: string
   status: string
   priority: string
+  acceptanceCriteria?: string | null
+  requestedDeliveryDate?: string | null
   businessProblem?: string | null
   expectedResult?: string | null
   category?: string | null
@@ -144,6 +219,8 @@ export type Requirement = {
 
 export type Ticket = {
   id: string
+  companyId?: string
+  productId?: string
   ticketNumber: string
   title: string
   description: string
@@ -182,7 +259,7 @@ export type TeamMember = {
   lastName: string
   phone?: string | null
   isActive: boolean
-  role: { code: RoleCode; name: string }
+  role: { id: string; code: RoleCode; name: string }
   _count?: {
     followUpsAssigned: number
     ticketsAssigned: number
@@ -204,17 +281,20 @@ export type CardScanResult = {
   frontImageKey: string
   backImageKey?: string
   extraction: {
-    companyName?: string
-    firstName?: string
-    lastName?: string
-    jobTitle?: string
-    email?: string
-    mobile?: string
-    phone?: string
-    website?: string
-    address?: string
-    linkedinUrl?: string
-    twitterUrl?: string
+    contactName?: string | null
+    companyName?: string | null
+    jobTitle?: string | null
+    email?: string | null
+    mobile?: string | null
+    phone?: string | null
+    website?: string | null
+    address?: string | null
+    socialProfiles?: {
+      linkedin?: string | null
+      twitter?: string | null
+      other?: string | null
+    } | null
+    suggestedBusinessCategory?: string | null
     confidence?: Record<string, number>
   }
   mode?: string

@@ -22,6 +22,7 @@ type AuthContextValue = {
   isManager: boolean
   isCustomer: boolean
   canManage: boolean
+  can: (permission: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -49,8 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    const restore = getToken()
+      ? api<{ user: AuthUser }>('/api/auth/me')
+          .then((data) => setUser(data.user))
+          .catch(() => setToken(null))
+      : Promise.resolve()
+    void restore.finally(() => setLoading(false))
+  }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await api<{ token: string; user: AuthUser }>('/api/auth/login', {
@@ -84,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isManager: user?.roleCode === 'IT_MANAGER' || user?.roleCode === 'CRM_ADMIN',
       isCustomer: user?.roleCode === 'CUSTOMER',
       canManage: user?.roleCode === 'CRM_ADMIN' || user?.roleCode === 'IT_MANAGER',
+      can: (permission: string) =>
+        Boolean(user && (user.roleCode === 'CRM_ADMIN' || user.permissions.includes(permission))),
     }),
     [user, loading, login, logout, refresh]
   )

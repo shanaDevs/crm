@@ -25,6 +25,7 @@ function isLocalApiUrl(url: string) {
 
 /**
  * Resolve API base URL:
+ * 0) On localhost with NEXT_PUBLIC_API_URL set → that URL
  * 1) Runtime CapRover env (`/env.js` → window.__CRM_API_URL__) — ignore localhost on hosted sites
  * 2) On any hosted domain → live backend (never localhost)
  * 3) NEXT_PUBLIC_API_URL build/runtime env (non-local only when hosted)
@@ -34,6 +35,12 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const onLocalPage = isLocalHost(window.location.hostname)
     const runtime = window.__CRM_API_URL__?.trim()
+    const localEnv = process.env.NEXT_PUBLIC_API_URL?.trim()
+
+    // The committed public/env.js points at the live API; local dev must use .env.local instead.
+    if (onLocalPage && localEnv) {
+      return trimSlash(localEnv)
+    }
 
     if (runtime && (onLocalPage || !isLocalApiUrl(runtime))) {
       return trimSlash(runtime)
@@ -122,10 +129,10 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
     : await res.text().catch(() => null)
 
   if (!res.ok) {
+    const error = data && typeof data === 'object' && 'error' in data ? (data as { error: unknown }).error : null
     const message =
-      (data && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
-        ? (data as { error: string }).error
-        : null) ||
+      (typeof error === 'string' ? error : null) ||
+      validationMessage(error) ||
       (typeof data === 'string' && data) ||
       res.statusText ||
       'Request failed'
@@ -133,4 +140,18 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
   }
 
   return data as T
+}
+
+/** Turns a zod `flatten()` payload into "Field: problem" text. */
+function validationMessage(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null
+  const { formErrors, fieldErrors } = error as { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> }
+  const parts = [
+    ...(formErrors || []),
+    ...Object.entries(fieldErrors || {}).map(([field, problems]) => {
+      const label = field.replace(/([A-Z])/g, ' $1').replace(/Id$/, '').trim()
+      return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${(problems || []).join(', ')}`
+    }),
+  ]
+  return parts.length ? parts.join('; ') : null
 }

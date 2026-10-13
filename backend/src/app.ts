@@ -18,6 +18,8 @@ import {
   settingsRouter,
   filesRouter,
 } from './routes/misc'
+import { rolesRouter, usersRouter, levelsRouter } from './routes/access'
+import geoRoutes from './routes/geo'
 import { prisma } from './lib/prisma'
 import { requireAuth, requirePermission } from './middleware/auth'
 
@@ -54,6 +56,7 @@ export function createApp() {
   app.use('/api/cards', cardsRoutes)
   app.use('/api/follow-ups', followUpsRoutes)
   app.use('/api/visits', visitsRoutes)
+  app.use('/api/geo', geoRoutes)
   app.use('/api/products', productsRouter)
   app.use('/api/opportunities', opportunitiesRouter)
   app.use('/api/requirements', requirementsRoutes)
@@ -61,6 +64,9 @@ export function createApp() {
   app.use('/api/notifications', notificationsRouter)
   app.use('/api/dashboard', dashboardRouter)
   app.use('/api/team', teamRouter)
+  app.use('/api/team', usersRouter)
+  app.use('/api/roles', rolesRouter)
+  app.use('/api/customer-levels', levelsRouter)
   app.use('/api/settings', settingsRouter)
   app.use('/api/files', filesRouter)
 

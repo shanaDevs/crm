@@ -13,8 +13,25 @@ import {
   PageHeader,
 } from '@/components/ui'
 
+type SmsStatus = {
+  provider: string | null
+  senderId: string | null
+  configured: boolean
+  account: { ok: true; status: string; balance: string } | { ok: false; error: string } | null
+}
+
+function describeSms(s: SmsStatus | null) {
+  if (!s) return 'SMS status unavailable.'
+  if (!s.configured) return 'SMS is not configured on the server (see SMSLENZ_* in backend/.env).'
+  const base = `Sending through ${s.provider} as ${s.senderId}.`
+  if (!s.account) return base
+  return s.account.ok
+    ? `${base} Account ${s.account.status}, credit balance ${s.account.balance}.`
+    : `${base} Account check failed: ${s.account.error}`
+}
+
 export default function SettingsPage() {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, can, refresh } = useAuth()
   const [settings, setSettings] = useState<Record<string, unknown>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,8 +41,18 @@ export default function SettingsPage() {
   const [spacesResult, setSpacesResult] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<string | null>(null)
   const [aiResult, setAiResult] = useState<string | null>(null)
+  const [smsStatus, setSmsStatus] = useState<SmsStatus | null>(null)
+  const [myPhone, setMyPhone] = useState<string | null>(null)
+  const [phoneMessage, setPhoneMessage] = useState<string | null>(null)
+  const [testTo, setTestTo] = useState('')
+  const [smsResult, setSmsResult] = useState<string | null>(null)
+  const [smsBusy, setSmsBusy] = useState(false)
 
   useEffect(() => {
+    api<SmsStatus>('/api/settings/sms-status')
+      .then(setSmsStatus)
+      .catch(() => setSmsStatus(null))
+
     api<Record<string, unknown>>('/api/settings')
       .then(setSettings)
       .catch((err) => setError(err.message || 'Failed to load settings'))
@@ -84,6 +111,34 @@ export default function SettingsPage() {
       setAiResult(`${result.ok ? 'OK' : 'Failed'}: ${result.message}${result.model ? ` (${result.model})` : ''}`)
     } catch (err) {
       setAiResult(err instanceof Error ? err.message : 'AI test failed')
+    }
+  }
+
+  async function savePhone() {
+    setPhoneMessage(null)
+    try {
+      await api('/api/auth/me', { method: 'PATCH', body: { phone: myPhone ?? '' } })
+      await refresh()
+      setMyPhone(null)
+      setPhoneMessage('Saved')
+    } catch (err) {
+      setPhoneMessage(err instanceof ApiError ? err.message : 'Failed to save number')
+    }
+  }
+
+  async function testSms() {
+    setSmsBusy(true)
+    setSmsResult(null)
+    try {
+      const result = await api<{ ok: boolean; message: string }>('/api/settings/test-sms', {
+        method: 'POST',
+        body: { to: testTo },
+      })
+      setSmsResult(`${result.ok ? 'OK' : 'Failed'}: ${result.message}`)
+    } catch (err) {
+      setSmsResult(err instanceof ApiError ? err.message : 'SMS test failed')
+    } finally {
+      setSmsBusy(false)
     }
   }
 
@@ -158,6 +213,42 @@ export default function SettingsPage() {
           ) : (
             <p className="text-sm text-[var(--muted)]">Only admins can edit system settings.</p>
           )}
+        </Card>
+
+        <Card title="SMS reminders">
+          <div className="space-y-4 text-sm">
+            <p className="text-[var(--muted)]">{describeSms(smsStatus)}</p>
+            <Field label="Your mobile number (for follow-up reminders)">
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  className="max-w-xs"
+                  placeholder="e.g. 0771234567"
+                  value={myPhone ?? user?.phone ?? ''}
+                  onChange={(e) => setMyPhone(e.target.value)}
+                />
+                <Button variant="secondary" disabled={myPhone === null} onClick={() => void savePhone()}>
+                  Save
+                </Button>
+              </div>
+            </Field>
+            {phoneMessage ? <p className="text-xs text-[var(--muted)]">{phoneMessage}</p> : null}
+            {can('settings.write') ? (
+              <Field label="Send a test SMS to">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    className="max-w-xs"
+                    placeholder="e.g. 0771234567"
+                    value={testTo}
+                    onChange={(e) => setTestTo(e.target.value)}
+                  />
+                  <Button variant="secondary" disabled={smsBusy || !testTo.trim()} onClick={() => void testSms()}>
+                    {smsBusy ? 'Sending…' : 'Send test SMS'}
+                  </Button>
+                </div>
+              </Field>
+            ) : null}
+            {smsResult ? <p className="text-xs text-[var(--muted)]">{smsResult}</p> : null}
+          </div>
         </Card>
       </div>
     </div>
