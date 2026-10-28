@@ -47,7 +47,7 @@ export default function TicketDetailPage() {
         setTicket(data)
         setStatus(data.status)
         setAssigneeId(data.assignee?.id || '')
-        if (canManage) {
+        if (canManage || can('tickets.write')) {
           const users = await api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[])
           setTeam(users.filter((u) => u.isActive && u.role.code !== 'CUSTOMER'))
         }
@@ -183,14 +183,14 @@ export default function TicketDetailPage() {
             <Button size="sm" onClick={() => void updateStatus()} disabled={saving}>
               Update status
             </Button>
-            {canManage ? (
+            {canManage || can('tickets.write') ? (
               <>
                 <Field label="Assignee">
                   <Select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
                     <option value="">Unassigned</option>
                     {team.map((member) => (
                       <option key={member.id} value={member.id}>
-                        {fullName(member)}
+                        {fullName(member)} ({member.role?.name || member.role?.code})
                       </option>
                     ))}
                   </Select>

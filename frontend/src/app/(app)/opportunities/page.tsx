@@ -32,6 +32,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui'
+import { OpportunityStageManager } from '@/components/OpportunityStageManager'
 
 const emptyForm = (companyId = '') => ({
   title: '',
@@ -61,6 +62,7 @@ export default function OpportunitiesPage({
   const [error, setError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [open, setOpen] = useState(Boolean(query.new))
+  const [stageManagerOpen, setStageManagerOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(() => emptyForm(presetCompanyId))
@@ -203,7 +205,14 @@ export default function OpportunitiesPage({
                 <Button variant="secondary">Show all customers</Button>
               </Link>
             ) : null}
-            {canWrite ? <Button onClick={openCreate}>New opportunity</Button> : null}
+            {canWrite ? (
+              <>
+                <Button variant="secondary" onClick={() => setStageManagerOpen(true)}>
+                  Manage stages
+                </Button>
+                <Button onClick={openCreate}>New opportunity</Button>
+              </>
+            ) : null}
           </>
         }
       />
@@ -328,6 +337,13 @@ export default function OpportunitiesPage({
           </Button>
         </form>
       </Modal>
+
+      <OpportunityStageManager
+        open={stageManagerOpen}
+        onClose={() => setStageManagerOpen(false)}
+        stages={stages}
+        onUpdated={load}
+      />
     </div>
   )
 }

@@ -1,0 +1,224 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - link [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=e17]: CRM Tool
+          - paragraph [ref=e18]: Sales & delivery workspace
+        - navigation "Main" [ref=e19]:
+          - list [ref=e20]:
+            - listitem [ref=e21]:
+              - link "Dashboard" [ref=e22] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=e30]:
+              - link "Customers" [ref=e31] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=e38]:
+              - link "Scan Card" [ref=e39] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=e45]:
+              - link "Visits" [ref=e46] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=e52]:
+              - link "Follow-ups" [ref=e53] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=e60]:
+              - link "Products" [ref=e61] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=e68]:
+              - link "Opportunities" [ref=e69] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=e75]:
+              - link "Requirements" [ref=e76] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=e82]:
+              - link "Tickets" [ref=e83] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=e88]:
+              - link "Team" [ref=e89] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=e97]:
+              - link "Roles & permissions" [ref=e98] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=e104]:
+              - link "Notifications" [ref=e105] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=e111]:
+              - link "Reports" [ref=e112] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=e117]:
+              - link "Settings" [ref=e118] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=e124]:
+              - link "Customer Portal" [ref=e125] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: A
+            - generic [ref=e134]:
+              - paragraph [ref=e135]: Alex Admin
+              - paragraph [ref=e136]: CRM Admin
+          - button "Sign out" [ref=e137]
+    - main [ref=e142]:
+      - generic [ref=e143]:
+        - generic [ref=e144]:
+          - generic [ref=e145]:
+            - heading "Opportunities" [level=1] [ref=e146]
+            - paragraph [ref=e147]: Pipeline by stage. Drag a card to another column to change its stage.
+          - generic [ref=e148]:
+            - button "Manage stages" [ref=e149]
+            - button "New opportunity" [ref=e150]
+        - generic [ref=e151]:
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - paragraph [ref=e154]: New
+              - generic [ref=e155]: "2"
+            - generic [ref=e156]:
+              - button [ref=e157]:
+                - generic [ref=e167]:
+                  - paragraph [ref=e168]: Nexus Technologies PVT - POS System
+                  - paragraph [ref=e169]:
+                    - link "Nexus Technologies PVT" [ref=e170] [cursor=pointer]:
+                      - /url: /customers/cmvs0w9v9001jx8rsdxox0rrt
+                    - text: · POS System
+                  - paragraph [ref=e171]: LKR 250,000 · Alex Admin
+                  - generic [ref=e172]:
+                    - button "Edit" [ref=e173]
+                    - button "Delete" [ref=e174]
+              - button [ref=e175]:
+                - generic [ref=e185]:
+                  - paragraph [ref=e186]: utftu
+                  - paragraph [ref=e187]:
+                    - link "datcodes" [ref=e188] [cursor=pointer]:
+                      - /url: /customers/cmv6be3nx0004u3s46e8j37dk
+                    - text: · HR System
+                  - paragraph [ref=e189]: USD 15,000 · Alex Admin
+                  - generic [ref=e190]:
+                    - button "Edit" [ref=e191]
+                    - button "Delete" [ref=e192]
+          - generic [ref=e193]:
+            - generic [ref=e194]:
+              - paragraph [ref=e195]: Contacted
+              - generic [ref=e196]: "0"
+            - paragraph [ref=e198]: Drop here
+          - generic [ref=e199]:
+            - generic [ref=e200]:
+              - paragraph [ref=e201]: Qualified
+              - generic [ref=e202]: "0"
+            - paragraph [ref=e204]: Drop here
+          - generic [ref=e205]:
+            - generic [ref=e206]:
+              - paragraph [ref=e207]: Demo Scheduled
+              - generic [ref=e208]: "0"
+            - paragraph [ref=e210]: Drop here
+          - generic [ref=e211]:
+            - generic [ref=e212]:
+              - paragraph [ref=e213]: Proposal Sent
+              - generic [ref=e214]: "0"
+            - paragraph [ref=e216]: Drop here
+          - generic [ref=e217]:
+            - generic [ref=e218]:
+              - paragraph [ref=e219]: Negotiation
+              - generic [ref=e220]: "0"
+            - paragraph [ref=e222]: Drop here
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - paragraph [ref=e225]: Won
+              - generic [ref=e226]: "0"
+            - paragraph [ref=e228]: Drop here
+          - generic [ref=e229]:
+            - generic [ref=e230]:
+              - paragraph [ref=e231]: Lost
+              - generic [ref=e232]: "0"
+            - paragraph [ref=e234]: Drop here
+        - status [ref=e235]
+        - generic [ref=e236]:
+          - button "Close" [ref=e237]
+          - generic [ref=e238]:
+            - generic [ref=e239]:
+              - heading "Manage Pipeline Stages" [level=3] [ref=e240]
+              - button "Close" [ref=e241]
+            - generic [ref=e243]:
+              - generic [ref=e244]:
+                - paragraph [ref=e245]: Add new stage option
+                - generic [ref=e246]:
+                  - generic [ref=e248]:
+                    - generic [ref=e249]: Stage name
+                    - textbox "e.g. Under Review, Negotiation, Won" [ref=e250]
+                  - generic [ref=e252]:
+                    - generic [ref=e253]: Outcome type
+                    - combobox [ref=e254]:
+                      - option "In Progress" [selected]
+                      - option "Won (Success)"
+                      - option "Lost (Closed)"
+                  - button "Add stage" [disabled] [ref=e255]
+              - generic [ref=e257]:
+                - paragraph [ref=e258]: Current stages (8)
+                - generic [ref=e259]:
+                  - generic [ref=e260]:
+                    - generic [ref=e261]: New
+                    - generic [ref=e262]: In progress
+                    - generic [ref=e263]: (2 deals)
+                  - generic [ref=e264]:
+                    - button "Edit stage" [ref=e265]
+                    - button "Cannot delete stage with active opportunities" [disabled] [ref=e268]
+                - generic [ref=e272]:
+                  - generic [ref=e273]:
+                    - generic [ref=e274]: Contacted
+                    - generic [ref=e275]: In progress
+                    - generic [ref=e276]: (0 deals)
+                  - generic [ref=e277]:
+                    - button "Edit stage" [ref=e278]
+                    - button "Delete stage" [ref=e281]
+                - generic [ref=e285]:
+                  - generic [ref=e286]:
+                    - generic [ref=e287]: Qualified
+                    - generic [ref=e288]: In progress
+                    - generic [ref=e289]: (0 deals)
+                  - generic [ref=e290]:
+                    - button "Edit stage" [ref=e291]
+                    - button "Delete stage" [ref=e294]
+                - generic [ref=e298]:
+                  - generic [ref=e299]:
+                    - generic [ref=e300]: Demo Scheduled
+                    - generic [ref=e301]: In progress
+                    - generic [ref=e302]: (0 deals)
+                  - generic [ref=e303]:
+                    - button "Edit stage" [ref=e304]
+                    - button "Delete stage" [ref=e307]
+                - generic [ref=e311]:
+                  - generic [ref=e312]:
+                    - generic [ref=e313]: Proposal Sent
+                    - generic [ref=e314]: In progress
+                    - generic [ref=e315]: (0 deals)
+                  - generic [ref=e316]:
+                    - button "Edit stage" [ref=e317]
+                    - button "Delete stage" [ref=e320]
+                - generic [ref=e324]:
+                  - generic [ref=e325]:
+                    - generic [ref=e326]: Negotiation
+                    - generic [ref=e327]: In progress
+                    - generic [ref=e328]: (0 deals)
+                  - generic [ref=e329]:
+                    - button "Edit stage" [ref=e330]
+                    - button "Delete stage" [ref=e333]
+                - generic [ref=e337]:
+                  - generic [ref=e338]:
+                    - generic [ref=e339]: Won
+                    - generic [ref=e340]: Won
+                    - generic [ref=e341]: (0 deals)
+                  - generic [ref=e342]:
+                    - button "Edit stage" [ref=e343]
+                    - button "Delete stage" [ref=e346]
+                - generic [ref=e350]:
+                  - generic [ref=e351]:
+                    - generic [ref=e352]: Lost
+                    - generic [ref=e353]: Lost
+                    - generic [ref=e354]: (0 deals)
+                  - generic [ref=e355]:
+                    - button "Edit stage" [ref=e356]
+                    - button "Delete stage" [ref=e359]
+              - button "Done" [ref=e364]
+  - button "Open Next.js Dev Tools" [ref=e8] [cursor=pointer]
+  - alert [ref=e12]

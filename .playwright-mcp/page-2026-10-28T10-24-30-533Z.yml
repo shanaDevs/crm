@@ -1,0 +1,142 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - complementary [ref=f1e13]:
+      - generic [ref=f1e14]:
+        - link [ref=f1e16] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=f1e17]: CRM Tool
+          - paragraph [ref=f1e18]: Sales & delivery workspace
+        - navigation "Main" [ref=f1e19]:
+          - list [ref=f1e20]:
+            - listitem [ref=f1e21]:
+              - link "Dashboard" [ref=f1e22] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=f1e30]:
+              - link "Customers" [ref=f1e31] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=f1e38]:
+              - link "Scan Card" [ref=f1e39] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=f1e45]:
+              - link "Visits" [ref=f1e46] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=f1e52]:
+              - link "Follow-ups" [ref=f1e53] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=f1e60]:
+              - link "Products" [ref=f1e61] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=f1e68]:
+              - link "Opportunities" [ref=f1e69] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=f1e75]:
+              - link "Requirements" [ref=f1e76] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=f1e82]:
+              - link "Tickets" [ref=f1e83] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=f1e88]:
+              - link "Team" [ref=f1e89] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=f1e97]:
+              - link "Roles & permissions" [ref=f1e98] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=f1e104]:
+              - link "Notifications" [ref=f1e105] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=f1e111]:
+              - link "Reports" [ref=f1e112] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=f1e117]:
+              - link "Settings" [ref=f1e118] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=f1e124]:
+              - link "Customer Portal" [ref=f1e125] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=f1e131]:
+          - generic [ref=f1e132]:
+            - generic [ref=f1e133]: A
+            - generic [ref=f1e134]:
+              - paragraph [ref=f1e135]: Alex Admin
+              - paragraph [ref=f1e136]: CRM Admin
+          - button "Sign out" [ref=f1e137]
+    - main [ref=f1e142]:
+      - generic [ref=f1e484]:
+        - generic [ref=f1e486]:
+          - heading "Edit Acme Technologies" [level=1] [ref=f1e487]
+          - paragraph [ref=f1e488]: Update company details, level and primary contact.
+        - generic [ref=f1e489]:
+          - generic [ref=f1e490]:
+            - heading "Company" [level=2] [ref=f1e492]
+            - generic [ref=f1e494]:
+              - generic [ref=f1e495]:
+                - generic [ref=f1e496]: Company name
+                - textbox [ref=f1e497]: Acme Technologies
+              - generic [ref=f1e498]:
+                - generic [ref=f1e499]: Level
+                - combobox [ref=f1e500]:
+                  - option "No level" [selected]
+                  - option "Hot"
+                  - option "Warm"
+                  - option "Cold"
+              - generic [ref=f1e501]:
+                - generic [ref=f1e502]: Lead status
+                - combobox [ref=f1e503]:
+                  - option "New" [selected]
+                  - option "Contacted"
+                  - option "Qualified"
+                  - option "Nurturing"
+                  - option "Converted"
+                  - option "Lost"
+              - generic [ref=f1e504]:
+                - generic [ref=f1e505]: Website
+                - textbox [ref=f1e506]
+              - generic [ref=f1e507]:
+                - generic [ref=f1e508]: Category
+                - textbox [ref=f1e509]
+              - generic [ref=f1e510]:
+                - generic [ref=f1e511]: Lead source
+                - generic [ref=f1e512]:
+                  - combobox [ref=f1e513]:
+                    - option "Business card"
+                    - option "Referral"
+                    - option "Website"
+                    - option "Event"
+                    - option "Social Media & Ads" [selected]
+                    - option "Sales Ex- Seneth"
+                  - button "Add or edit lead sources" [ref=f1e514]
+              - generic [ref=f1e516]:
+                - generic [ref=f1e517]: Address
+                - textbox [ref=f1e518]
+              - generic [ref=f1e519]:
+                - generic [ref=f1e520]: City
+                - textbox [ref=f1e521]
+              - generic [ref=f1e522]:
+                - generic [ref=f1e523]: Country
+                - textbox [ref=f1e524]
+              - generic [ref=f1e525]:
+                - generic [ref=f1e526]: Notes
+                - textbox [ref=f1e527]
+          - generic [ref=f1e528]:
+            - heading "Primary contact" [level=2] [ref=f1e530]
+            - generic [ref=f1e532]:
+              - generic [ref=f1e533]:
+                - generic [ref=f1e534]: Name
+                - textbox [ref=f1e535]: John Doe
+              - generic [ref=f1e536]:
+                - generic [ref=f1e537]: Job title
+                - textbox [ref=f1e538]
+              - generic [ref=f1e539]:
+                - generic [ref=f1e540]: Email
+                - textbox [ref=f1e541]
+              - generic [ref=f1e542]:
+                - generic [ref=f1e543]: Mobile
+                - textbox [ref=f1e544]
+              - generic [ref=f1e545]:
+                - generic [ref=f1e546]: Phone
+                - textbox [ref=f1e547]
+          - generic [ref=f1e548]:
+            - button "Save changes" [ref=f1e549]
+            - button "Cancel" [ref=f1e550]
+  - button "Open Next.js Dev Tools" [ref=f1e8] [cursor=pointer]
+  - alert [ref=f1e12]

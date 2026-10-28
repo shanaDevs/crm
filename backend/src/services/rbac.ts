@@ -155,13 +155,21 @@ export const SYSTEM_ROLES: Array<{ name: string; code: RoleCode; description: st
 ]
 
 const DEFAULT_LEVELS = [
-  { name: 'Hot', color: '#dc2626', sortOrder: 1 },
-  { name: 'Warm', color: '#d97706', sortOrder: 2 },
-  { name: 'Cold', color: '#2563eb', sortOrder: 3 },
+  { name: 'Low', color: '#2563eb', sortOrder: 1 },
+  { name: 'Medium', color: '#d97706', sortOrder: 2 },
+  { name: 'High', color: '#dc2626', sortOrder: 3 },
+]
+
+const DEFAULT_LEAD_SOURCES = [
+  { name: 'Manual', sortOrder: 1 },
+  { name: 'Business card', sortOrder: 2 },
+  { name: 'Referral', sortOrder: 3 },
+  { name: 'Website', sortOrder: 4 },
+  { name: 'Event', sortOrder: 5 },
 ]
 
 /**
- * Idempotent: creates missing permissions, system roles and default levels.
+ * Idempotent: creates missing permissions, system roles, default levels and default lead sources.
  * Existing role permissions are only touched for CRM Admin (always everything),
  * so edits made in the UI survive restarts.
  */
@@ -201,6 +209,10 @@ export async function ensureRbacDefaults(prisma: PrismaClient) {
 
   if ((await prisma.customerLevel.count()) === 0) {
     await prisma.customerLevel.createMany({ data: DEFAULT_LEVELS, skipDuplicates: true })
+  }
+
+  if ((await prisma.leadSource.count()) === 0) {
+    await prisma.leadSource.createMany({ data: DEFAULT_LEAD_SOURCES, skipDuplicates: true })
   }
 }
 

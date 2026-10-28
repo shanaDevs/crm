@@ -1,0 +1,66 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e8] [cursor=pointer]
+  - alert [ref=e12]
+  - generic [ref=e27]:
+    - complementary [ref=e28]:
+      - generic [ref=e29]:
+        - link [ref=e31] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=e32]: CRM Tool
+          - paragraph [ref=e33]: Sales & delivery workspace
+        - navigation "Main" [ref=e34]:
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "Dashboard" [ref=e37] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=e45]:
+              - link "Customers" [ref=e46] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=e53]:
+              - link "Scan Card" [ref=e54] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=e60]:
+              - link "Visits" [ref=e61] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=e67]:
+              - link "Follow-ups" [ref=e68] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=e75]:
+              - link "Products" [ref=e76] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=e83]:
+              - link "Opportunities" [ref=e84] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=e90]:
+              - link "Requirements" [ref=e91] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=e97]:
+              - link "Tickets" [ref=e98] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=e103]:
+              - link "Team" [ref=e104] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=e112]:
+              - link "Roles & permissions" [ref=e113] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=e119]:
+              - link "Notifications" [ref=e120] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=e126]:
+              - link "Reports" [ref=e127] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=e132]:
+              - link "Settings" [ref=e133] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=e139]:
+              - link "Customer Portal" [ref=e140] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]: A
+            - generic [ref=e149]:
+              - paragraph [ref=e150]: Alex Admin
+              - paragraph [ref=e151]: CRM Admin
+          - button "Sign out" [ref=e152]
+    - main [ref=e157]:
+      - generic [ref=e158]: Loading…

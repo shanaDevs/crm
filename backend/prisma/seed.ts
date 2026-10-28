@@ -9,20 +9,20 @@ async function main() {
   await ensureRbacDefaults(prisma)
 
   const stages: Array<{
-    code: OpportunityStageCode
+    code: string
     name: string
     sortOrder: number
     isWon?: boolean
     isLost?: boolean
   }> = [
-    { code: OpportunityStageCode.NEW, name: 'New', sortOrder: 1 },
-    { code: OpportunityStageCode.CONTACTED, name: 'Contacted', sortOrder: 2 },
-    { code: OpportunityStageCode.QUALIFIED, name: 'Qualified', sortOrder: 3 },
-    { code: OpportunityStageCode.DEMO_SCHEDULED, name: 'Demo Scheduled', sortOrder: 4 },
-    { code: OpportunityStageCode.PROPOSAL_SENT, name: 'Proposal Sent', sortOrder: 5 },
-    { code: OpportunityStageCode.NEGOTIATION, name: 'Negotiation', sortOrder: 6 },
-    { code: OpportunityStageCode.WON, name: 'Won', sortOrder: 7, isWon: true },
-    { code: OpportunityStageCode.LOST, name: 'Lost', sortOrder: 8, isLost: true },
+    { code: 'NEW', name: 'New', sortOrder: 1 },
+    { code: 'CONTACTED', name: 'Contacted', sortOrder: 2 },
+    { code: 'QUALIFIED', name: 'Qualified', sortOrder: 3 },
+    { code: 'DEMO_SCHEDULED', name: 'Demo Scheduled', sortOrder: 4 },
+    { code: 'PROPOSAL_SENT', name: 'Proposal Sent', sortOrder: 5 },
+    { code: 'NEGOTIATION', name: 'Negotiation', sortOrder: 6 },
+    { code: 'WON', name: 'Won', sortOrder: 7, isWon: true },
+    { code: 'LOST', name: 'Lost', sortOrder: 8, isLost: true },
   ]
   for (const s of stages) {
     await prisma.opportunityStage.upsert({

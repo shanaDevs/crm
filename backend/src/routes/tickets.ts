@@ -126,6 +126,16 @@ router.patch('/:id', requirePermission('tickets.write'), async (req, res) => {
     where: { id: existing.id },
     data: { ...data, dueDate: dueDate === undefined ? undefined : dueDate ? new Date(dueDate) : null },
   })
+
+  if (data.assigneeId && data.assigneeId !== existing.assigneeId) {
+    await notifyUser({
+      userId: data.assigneeId,
+      title: 'Ticket assigned to you',
+      body: `${ticket.ticketNumber}: ${ticket.title}`,
+      linkUrl: `/tickets/${ticket.id}`,
+    })
+  }
+
   return res.json(ticket)
 })
 
@@ -136,8 +146,8 @@ router.delete('/:id', requirePermission('tickets.manage'), async (req, res) => {
   return res.json({ ok: true })
 })
 
-router.patch('/:id/assign', requirePermission('tickets.manage'), async (req, res) => {
-  const assigneeId = req.body.assigneeId as string
+router.patch('/:id/assign', requirePermission('tickets.manage', 'tickets.write'), async (req, res) => {
+  const assigneeId = (req.body.assigneeId as string) || null
   const existing = await prisma.ticket.findUnique({ where: { id: param(req, 'id') } })
   if (!existing) return res.status(404).json({ error: 'Not found' })
 
@@ -146,10 +156,10 @@ router.patch('/:id/assign', requirePermission('tickets.manage'), async (req, res
     data: { assigneeId },
   })
 
-  if (assigneeId) {
+  if (assigneeId && assigneeId !== existing.assigneeId) {
     await notifyUser({
       userId: assigneeId,
-      title: 'Ticket reassigned to you',
+      title: 'Ticket assigned to you',
       body: `${ticket.ticketNumber}: ${ticket.title}`,
       linkUrl: `/tickets/${ticket.id}`,
     })
