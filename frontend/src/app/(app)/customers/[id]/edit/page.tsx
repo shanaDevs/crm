@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { Company } from '@/lib/types'
 import { LevelSelect, useCustomerLevels } from '@/components/levels'
+import { LeadSourceSelect } from '@/components/leadSources'
 import {
   Button,
   Card,
@@ -151,7 +152,10 @@ export default function EditCustomerPage() {
               <Input value={form.businessCategory} onChange={(e) => update('businessCategory', e.target.value)} />
             </Field>
             <Field label="Lead source">
-              <Input value={form.leadSource} onChange={(e) => update('leadSource', e.target.value)} />
+              <LeadSourceSelect
+                value={form.leadSource}
+                onChange={(value) => update('leadSource', value)}
+              />
             </Field>
             <Field label="Address">
               <Input value={form.addressLine1} onChange={(e) => update('addressLine1', e.target.value)} />

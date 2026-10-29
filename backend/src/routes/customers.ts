@@ -97,6 +97,15 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
   const plan = parseFollowUpPlan(req.body.followUp, req.user!)
   if (!plan.ok) return res.status(plan.status).json({ error: plan.error })
 
+  let opportunityStage = null
+  if (data.opportunity) {
+    const product = await prisma.product.findUnique({ where: { id: data.opportunity.productId } })
+    if (!product) return res.status(400).json({ error: 'Selected product for opportunity does not exist' })
+    const stageCode = data.opportunity.stageCode || 'NEW'
+    opportunityStage = await prisma.opportunityStage.findUnique({ where: { code: stageCode } })
+    if (!opportunityStage) return res.status(400).json({ error: 'Selected opportunity stage is invalid' })
+  }
+
   const company = await prisma.company.create({
     data: {
       name: data.name,
@@ -151,6 +160,34 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
     },
   })
 
+  const opportunity = data.opportunity && opportunityStage
+    ? await prisma.opportunity.create({
+        data: {
+          companyId: company.id,
+          productId: data.opportunity.productId,
+          stageId: opportunityStage.id,
+          title: data.opportunity.title,
+          value: data.opportunity.value,
+          currency: data.opportunity.currency || 'LKR',
+          expectedCloseDate: data.opportunity.expectedCloseDate ? new Date(data.opportunity.expectedCloseDate) : null,
+          notes: data.opportunity.notes,
+          ownerId: req.user!.id,
+        },
+        include: { stage: true, product: true },
+      })
+    : null
+
+  if (opportunity) {
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'opportunity.create',
+        entityType: 'Opportunity',
+        entityId: opportunity.id,
+      },
+    })
+  }
+
   const followUp = plan.value
     ? await createFollowUp(
         { ...plan.value, companyId: company.id, contactId: company.contacts[0]?.id, assigneeId: req.user!.id },
@@ -158,7 +195,7 @@ router.post('/', requirePermission('customers.write'), async (req, res) => {
       )
     : null
 
-  return res.status(201).json({ ...company, followUp })
+  return res.status(201).json({ ...company, followUp, opportunity })
 })
 
 router.patch('/:id', requirePermission('customers.write'), async (req, res) => {

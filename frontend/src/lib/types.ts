@@ -27,6 +27,14 @@ export type CustomerLevel = {
   _count?: { companies: number }
 }
 
+export type LeadSource = {
+  id: string
+  name: string
+  sortOrder: number
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type BusinessCard = {
   id: string
   frontImageKey: string
@@ -174,6 +182,7 @@ export type OpportunityStage = {
   sortOrder: number
   isWon?: boolean
   isLost?: boolean
+  _count?: { opportunities: number }
 }
 
 export type Opportunity = {
@@ -221,6 +230,7 @@ export type Ticket = {
   id: string
   companyId?: string
   productId?: string
+  assigneeId?: string | null
   ticketNumber: string
   title: string
   description: string

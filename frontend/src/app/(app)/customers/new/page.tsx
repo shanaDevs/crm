@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { Button, Card, ErrorBanner, Field, Input, PageHeader, Select, Textarea } from '@/components/ui'
 import { LevelSelect, useCustomerLevels } from '@/components/levels'
+import { LeadSourceSelect } from '@/components/leadSources'
 import { FollowUpScheduler, emptyFollowUpPlan, followUpPlanPayload } from '@/components/FollowUpScheduler'
+import {
+  OpportunityFormSection,
+  emptyOpportunityPlan,
+  opportunityPlanPayload,
+} from '@/components/OpportunityFormSection'
 
 export default function NewCustomerPage() {
   const router = useRouter()
@@ -13,6 +19,7 @@ export default function NewCustomerPage() {
   const [saving, setSaving] = useState(false)
   const { levels } = useCustomerLevels()
   const [followUp, setFollowUp] = useState(emptyFollowUpPlan)
+  const [opportunity, setOpportunity] = useState(emptyOpportunityPlan)
   const [form, setForm] = useState({
     levelId: null as string | null,
     name: '',
@@ -61,6 +68,7 @@ export default function NewCustomerPage() {
             phone: form.phone || null,
             isPrimary: true,
           },
+          opportunity: opportunityPlanPayload(opportunity),
           followUp: followUpPlanPayload(followUp, form.mobile || form.phone),
         },
       })
@@ -92,13 +100,10 @@ export default function NewCustomerPage() {
               <Input value={form.businessCategory} onChange={(e) => update('businessCategory', e.target.value)} />
             </Field>
             <Field label="Lead source">
-              <Select value={form.leadSource} onChange={(e) => update('leadSource', e.target.value)}>
-                <option value="MANUAL">Manual</option>
-                <option value="BUSINESS_CARD">Business card</option>
-                <option value="REFERRAL">Referral</option>
-                <option value="WEBSITE">Website</option>
-                <option value="EVENT">Event</option>
-              </Select>
+              <LeadSourceSelect
+                value={form.leadSource}
+                onChange={(value) => update('leadSource', value)}
+              />
             </Field>
             <Field label="Address">
               <Input value={form.addressLine1} onChange={(e) => update('addressLine1', e.target.value)} />
@@ -136,7 +141,16 @@ export default function NewCustomerPage() {
             </Field>
           </div>
         </Card>
-        <FollowUpScheduler value={followUp} onChange={setFollowUp} customerMobile={form.mobile || form.phone} />
+        <OpportunityFormSection
+          value={opportunity}
+          onChange={setOpportunity}
+          companyName={form.name}
+        />
+        <FollowUpScheduler
+          value={followUp}
+          onChange={setFollowUp}
+          customerMobile={form.mobile || form.phone}
+        />
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Create customer'}

@@ -436,7 +436,7 @@ model CompanyProductInterest {
 
 model OpportunityStage {
   id          String               @id @default(cuid())
-  code        OpportunityStageCode @unique
+  code        String               @unique
   name        String
   sortOrder   Int
   isWon       Boolean              @default(false)
@@ -834,4 +834,14 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model LeadSource {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
 }

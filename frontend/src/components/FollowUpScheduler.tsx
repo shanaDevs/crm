@@ -63,10 +63,12 @@ export function FollowUpScheduler({
   value,
   onChange,
   customerMobile,
+  required = false,
 }: {
   value: FollowUpPlanForm
   onChange: (next: FollowUpPlanForm) => void
   customerMobile: string
+  required?: boolean
 }) {
   const { user, can, refresh } = useAuth()
   const [phoneDraft, setPhoneDraft] = useState('')
@@ -93,14 +95,18 @@ export function FollowUpScheduler({
 
   return (
     <Card title="Follow-up">
-      <label className="flex items-center gap-2 text-sm font-medium">
+      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
         <input
           type="checkbox"
           className="h-4 w-4 accent-[var(--primary)]"
           checked={value.enabled}
           onChange={(e) => set('enabled', e.target.checked)}
+          required={required}
         />
-        Schedule a follow-up for this customer
+        <span>
+          Schedule a follow-up for this customer{' '}
+          {required ? <span className="text-red-500 font-bold">*</span> : null}
+        </span>
       </label>
 
       {value.enabled ? (

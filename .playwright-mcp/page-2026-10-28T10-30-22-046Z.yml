@@ -1,0 +1,169 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - link [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=e17]: CRM Tool
+          - paragraph [ref=e18]: Sales & delivery workspace
+        - navigation "Main" [ref=e19]:
+          - list [ref=e20]:
+            - listitem [ref=e21]:
+              - link "Dashboard" [ref=e22] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=e30]:
+              - link "Customers" [ref=e31] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=e38]:
+              - link "Scan Card" [ref=e39] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=e45]:
+              - link "Visits" [ref=e46] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=e52]:
+              - link "Follow-ups" [ref=e53] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=e60]:
+              - link "Products" [ref=e61] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=e68]:
+              - link "Opportunities" [ref=e69] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=e75]:
+              - link "Requirements" [ref=e76] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=e82]:
+              - link "Tickets" [ref=e83] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=e88]:
+              - link "Team" [ref=e89] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=e97]:
+              - link "Roles & permissions" [ref=e98] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=e104]:
+              - link "Notifications" [ref=e105] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=e111]:
+              - link "Reports" [ref=e112] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=e117]:
+              - link "Settings" [ref=e118] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=e124]:
+              - link "Customer Portal" [ref=e125] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: A
+            - generic [ref=e134]:
+              - paragraph [ref=e135]: Alex Admin
+              - paragraph [ref=e136]: CRM Admin
+          - button "Sign out" [ref=e137]
+    - main [ref=e142]:
+      - generic [ref=e248]:
+        - generic [ref=e249]:
+          - generic [ref=e250]:
+            - heading "Test Corp" [level=1] [ref=e251]
+            - paragraph [ref=e252]: Customer profile
+          - generic [ref=e253]:
+            - generic [ref=e254]: No level
+            - generic [ref=e255]: New
+            - link [ref=e256] [cursor=pointer]:
+              - /url: /customers/cmvrz3yts0024x8ooyrqi66pk/edit
+              - button "Edit" [ref=e257]
+            - button "Delete" [ref=e258]
+        - generic [ref=e259]:
+          - generic [ref=e260]:
+            - heading "Overview" [level=2] [ref=e262]
+            - generic [ref=e264]:
+              - generic [ref=e265]:
+                - term [ref=e266]: Level
+                - definition [ref=e267]:
+                  - combobox [ref=e268]:
+                    - option "No level" [selected]
+                    - option "Hot"
+                    - option "Warm"
+                    - option "Cold"
+              - generic [ref=e269]:
+                - term [ref=e270]: Website
+                - definition [ref=e271]: —
+              - generic [ref=e272]:
+                - term [ref=e273]: Assigned officer
+                - definition [ref=e274]: Alex Admin
+              - generic [ref=e275]:
+                - term [ref=e276]: Lead source
+                - definition [ref=e277]: MANUAL
+              - generic [ref=e278]:
+                - term [ref=e279]: Notes
+                - definition [ref=e280]: —
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - heading "Contacts" [level=2] [ref=e283]
+              - button "Add contact" [ref=e284]
+            - list [ref=e286]:
+              - listitem [ref=e287]:
+                - generic [ref=e288]:
+                  - paragraph [ref=e289]: Alice SmithPrimary
+                  - paragraph [ref=e290]: —
+                - generic [ref=e291]:
+                  - generic [ref=e292]:
+                    - paragraph [ref=e293]: —
+                    - paragraph [ref=e294]: —
+                  - generic [ref=e295]:
+                    - button "Edit" [ref=e296]
+                    - button "Delete" [ref=e297]
+          - generic [ref=e298]:
+            - generic [ref=e299]:
+              - heading "Visits" [level=2] [ref=e300]
+              - link [ref=e301] [cursor=pointer]:
+                - /url: /visits?new=1&companyId=cmvrz3yts0024x8ooyrqi66pk
+                - button "Log visit" [ref=e302]
+            - generic [ref=e303]:
+              - paragraph [ref=e305]: No visits yet
+              - link "Open visits →" [ref=e306] [cursor=pointer]:
+                - /url: /visits
+          - generic [ref=e307]:
+            - heading "Business card" [level=2] [ref=e309]
+            - generic [ref=e311]:
+              - paragraph [ref=e312]: No business card scanned
+              - paragraph [ref=e313]: Cards scanned from the Scan Card page appear here.
+          - generic [ref=e314]:
+            - generic [ref=e315]:
+              - heading "Follow-ups" [level=2] [ref=e316]
+              - link [ref=e317] [cursor=pointer]:
+                - /url: /follow-ups?new=1&companyId=cmvrz3yts0024x8ooyrqi66pk
+                - button "Schedule" [ref=e318]
+            - generic [ref=e319]:
+              - list [ref=e320]:
+                - listitem [ref=e321]:
+                  - paragraph [ref=e322]: CALL · Scheduled
+                  - paragraph [ref=e323]: Oct 29, 2026 · 10:00 AM
+              - link "Open follow-ups →" [ref=e324] [cursor=pointer]:
+                - /url: /follow-ups?companyId=cmvrz3yts0024x8ooyrqi66pk
+          - generic [ref=e325]:
+            - generic [ref=e326]:
+              - heading "Opportunities" [level=2] [ref=e327]
+              - link [ref=e328] [cursor=pointer]:
+                - /url: /opportunities?new=1&companyId=cmvrz3yts0024x8ooyrqi66pk
+                - button "Add" [ref=e329]
+            - paragraph [ref=e332]: No opportunities
+          - generic [ref=e333]:
+            - heading "Tickets & requirements" [level=2] [ref=e335]
+            - generic [ref=e337]:
+              - generic [ref=e338]:
+                - generic [ref=e339]:
+                  - paragraph [ref=e340]: Tickets
+                  - link [ref=e341] [cursor=pointer]:
+                    - /url: /tickets?new=1&companyId=cmvrz3yts0024x8ooyrqi66pk
+                    - button "New ticket" [ref=e342]
+                - paragraph [ref=e343]: None
+              - generic [ref=e344]:
+                - generic [ref=e345]:
+                  - paragraph [ref=e346]: Requirements
+                  - link [ref=e347] [cursor=pointer]:
+                    - /url: /requirements?new=1&companyId=cmvrz3yts0024x8ooyrqi66pk
+                    - button "New requirement" [ref=e348]
+                - paragraph [ref=e349]: None
+  - button "Open Next.js Dev Tools" [ref=e8] [cursor=pointer]
+  - alert [ref=e12]

@@ -150,7 +150,7 @@ dashboardRouter.get('/', requirePermission('dashboard.read'), async (req, res) =
 const teamRouter = Router()
 teamRouter.use(requireAuth)
 
-teamRouter.get('/', requirePermission('team.read'), async (_req, res) => {
+teamRouter.get('/', requirePermission('team.read', 'tickets.write', 'tickets.manage', 'followups.write'), async (_req, res) => {
   const users = await prisma.user.findMany({
     where: { role: { code: { not: RoleCode.CUSTOMER } } },
     select: {

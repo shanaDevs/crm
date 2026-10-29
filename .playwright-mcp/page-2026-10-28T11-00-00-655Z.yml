@@ -1,0 +1,182 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - link [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=e17]: CRM Tool
+          - paragraph [ref=e18]: Sales & delivery workspace
+        - navigation "Main" [ref=e19]:
+          - list [ref=e20]:
+            - listitem [ref=e21]:
+              - link "Dashboard" [ref=e22] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=e30]:
+              - link "Customers" [ref=e31] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=e38]:
+              - link "Scan Card" [ref=e39] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=e45]:
+              - link "Visits" [ref=e46] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=e52]:
+              - link "Follow-ups" [ref=e53] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=e60]:
+              - link "Products" [ref=e61] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=e68]:
+              - link "Opportunities" [ref=e69] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=e75]:
+              - link "Requirements" [ref=e76] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=e82]:
+              - link "Tickets" [ref=e83] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=e88]:
+              - link "Team" [ref=e89] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=e97]:
+              - link "Roles & permissions" [ref=e98] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=e104]:
+              - link "Notifications" [ref=e105] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=e111]:
+              - link "Reports" [ref=e112] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=e117]:
+              - link "Settings" [ref=e118] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=e124]:
+              - link "Customer Portal" [ref=e125] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: A
+            - generic [ref=e134]:
+              - paragraph [ref=e135]: Alex Admin
+              - paragraph [ref=e136]: CRM Admin
+          - button "Sign out" [ref=e137]
+    - main [ref=e142]:
+      - generic [ref=e143]:
+        - generic [ref=e144]:
+          - generic [ref=e145]:
+            - heading "Tickets" [level=1] [ref=e146]
+            - paragraph [ref=e147]: Bugs, support, and delivery tickets.
+          - button "New ticket" [ref=e149]
+        - table [ref=e151]:
+          - rowgroup [ref=e152]:
+            - row [ref=e153]:
+              - columnheader "Ticket" [ref=e154]
+              - columnheader "Company" [ref=e155]
+              - columnheader "Type" [ref=e156]
+              - columnheader "Status" [ref=e157]
+              - columnheader "Priority" [ref=e158]
+              - columnheader "Actions" [ref=e159]
+          - rowgroup [ref=e160]:
+            - row [ref=e161]:
+              - cell [ref=e162]:
+                - 'link "TCK-00001: Fsgs" [ref=e163] [cursor=pointer]':
+                  - /url: /tickets/cmu6raq8n000ap501m8tokeco
+              - cell "BKT" [ref=e164]
+              - cell "Support" [ref=e165]
+              - cell "Open" [ref=e166]
+              - cell "Medium" [ref=e168]
+              - cell [ref=e170]:
+                - generic [ref=e171]:
+                  - link [ref=e172] [cursor=pointer]:
+                    - /url: /tickets/cmu6raq8n000ap501m8tokeco
+                    - button "View" [ref=e173]
+                  - button "Edit" [ref=e174]
+                  - button "Delete" [ref=e175]
+        - generic [ref=e176]:
+          - button "Close" [ref=e177]
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - heading "New ticket" [level=3] [ref=e180]
+              - button "Close" [ref=e181]
+            - generic [ref=e183]:
+              - generic [ref=e184]:
+                - generic [ref=e185]: Title
+                - textbox [ref=e186]: Urgent Sales Inflow Issue
+              - generic [ref=e187]:
+                - generic [ref=e188]: Description
+                - textbox [active] [ref=e189]: Client requested urgent follow-up on POS proposal.
+              - generic [ref=e190]:
+                - generic [ref=e191]: Customer
+                - combobox [ref=e192]:
+                  - option "Select"
+                  - option "BKT" [selected]
+                  - option "ANOJA DRAPES & WEAVES"
+                  - option "datcodes"
+                  - option "VISION INFINITY EYE CARE"
+                  - option "BIT of Sole"
+                  - option "National Optical"
+                  - option "Suwarnaa Gold House"
+                  - option "Zee Optics"
+                  - option "GLOBAL OPTICAL"
+                  - option "Matara Wasuda Jewellery"
+                  - option "AMAL Elegance"
+                  - option "Nugegoda Gold House"
+                  - option "LEATHER CLUB"
+                  - option "Shu Limit"
+                  - option "ANOMA Jewellers"
+                  - option "X-EYE CARE"
+                  - option "VISION LANKA"
+                  - option "New Kumaran's"
+                  - option "New GENESIS"
+                  - option "Double B"
+                  - option "NEW MORATUWA GOLD HOUSE"
+                  - option "New City"
+                  - option "Solid Jewellers"
+                  - option "BKT"
+                  - option "Taj Gem & Jewellery"
+                  - option "PELLE"
+                  - option "DSL ENTERPRISES (PVT) LTD."
+                  - option "Payless Shoesource"
+                  - option "D. Jeyamark"
+                  - option "SAHANA Jewellery"
+              - generic [ref=e193]:
+                - generic [ref=e194]: Product
+                - combobox [ref=e195]:
+                  - option "Select" [selected]
+                  - option "HR System"
+                  - option "Inventory Suite"
+                  - option "POS System"
+                  - option "Premium website"
+                  - option "Saloon management system"
+                  - option "Standard website"
+              - generic [ref=e196]:
+                - generic [ref=e197]:
+                  - generic [ref=e198]: Type
+                  - combobox [ref=e199]:
+                    - option "Bug"
+                    - option "Support" [selected]
+                    - option "Task"
+                    - option "Change Request"
+                - generic [ref=e200]:
+                  - generic [ref=e201]: Priority
+                  - combobox [ref=e202]:
+                    - option "Low"
+                    - option "Medium" [selected]
+                    - option "High"
+                    - option "Urgent"
+              - generic [ref=e203]:
+                - generic [ref=e204]: Assignee (e.g. Sales person, Developer)
+                - combobox [ref=e205]:
+                  - option "Unassigned" [selected]
+                  - option "Alex Admin (CRM Admin)"
+                  - option "Amika (Tele marketing and Customer Support Agent)"
+                  - option "Dana Developer (Developer)"
+                  - option "Ivy Manager (IT Manager)"
+                  - option "Morgan Officer (Marketing Officer)"
+                  - option "Sam Sales (Sales Executive)"
+              - generic [ref=e206]:
+                - generic [ref=e207]: Due date
+                - textbox [ref=e208]
+              - button "Create ticket" [ref=e209]
+  - button "Open Next.js Dev Tools" [ref=e8] [cursor=pointer]
+  - alert [ref=e12]

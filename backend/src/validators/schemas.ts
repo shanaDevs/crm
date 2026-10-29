@@ -5,6 +5,16 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 })
 
+export const opportunityPlanSchema = z.object({
+  productId: z.string().min(1),
+  title: z.string().min(1),
+  stageCode: z.string().trim().min(1).default('NEW').optional(),
+  value: z.number().optional().nullable(),
+  currency: z.string().optional(),
+  expectedCloseDate: z.string().datetime().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
 export const companyCreateSchema = z.object({
   name: z.string().min(1),
   website: z.string().optional().nullable(),
@@ -25,6 +35,7 @@ export const companyCreateSchema = z.object({
   assignedOfficerId: z.string().optional().nullable(),
   levelId: z.string().optional().nullable(),
   interestedProductIds: z.array(z.string()).optional(),
+  opportunity: opportunityPlanSchema.optional().nullable(),
   contact: z
     .object({
       firstName: z.string().min(1),
@@ -150,14 +161,27 @@ export const opportunityCreateSchema = z.object({
   companyId: z.string(),
   productId: z.string(),
   title: z.string().min(1),
-  stageCode: z
-    .enum(['NEW', 'CONTACTED', 'QUALIFIED', 'DEMO_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST'])
-    .default('NEW'),
+  stageCode: z.string().trim().min(1).default('NEW'),
   value: z.number().optional().nullable(),
   currency: z.string().optional(),
   expectedCloseDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
   ownerId: z.string().optional().nullable(),
+})
+
+export const opportunityStageCreateSchema = z.object({
+  name: z.string().trim().min(1),
+  code: z.string().trim().min(1).optional(),
+  sortOrder: z.number().int().optional(),
+  isWon: z.boolean().optional(),
+  isLost: z.boolean().optional(),
+})
+
+export const opportunityStageUpdateSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  sortOrder: z.number().int().optional(),
+  isWon: z.boolean().optional(),
+  isLost: z.boolean().optional(),
 })
 
 export const visitCreateSchema = z.object({
@@ -228,6 +252,7 @@ export const ticketUpdateSchema = z.object({
   type: ticketCreateSchema.shape.type.optional(),
   priority: priorityEnum.optional(),
   dueDate: nullableDate,
+  assigneeId: z.string().optional().nullable(),
 })
 
 export const visitUpdateSchema = z.object({

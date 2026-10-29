@@ -1,0 +1,166 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - complementary [ref=f1e13]:
+      - generic [ref=f1e14]:
+        - link [ref=f1e16] [cursor=pointer]:
+          - /url: /dashboard
+          - paragraph [ref=f1e17]: CRM Tool
+          - paragraph [ref=f1e18]: Sales & delivery workspace
+        - navigation "Main" [ref=f1e19]:
+          - list [ref=f1e20]:
+            - listitem [ref=f1e21]:
+              - link "Dashboard" [ref=f1e22] [cursor=pointer]:
+                - /url: /dashboard
+            - listitem [ref=f1e30]:
+              - link "Customers" [ref=f1e31] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=f1e38]:
+              - link "Scan Card" [ref=f1e39] [cursor=pointer]:
+                - /url: /scan
+            - listitem [ref=f1e45]:
+              - link "Visits" [ref=f1e46] [cursor=pointer]:
+                - /url: /visits
+            - listitem [ref=f1e52]:
+              - link "Follow-ups" [ref=f1e53] [cursor=pointer]:
+                - /url: /follow-ups
+            - listitem [ref=f1e60]:
+              - link "Products" [ref=f1e61] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=f1e68]:
+              - link "Opportunities" [ref=f1e69] [cursor=pointer]:
+                - /url: /opportunities
+            - listitem [ref=f1e75]:
+              - link "Requirements" [ref=f1e76] [cursor=pointer]:
+                - /url: /requirements
+            - listitem [ref=f1e82]:
+              - link "Tickets" [ref=f1e83] [cursor=pointer]:
+                - /url: /tickets
+            - listitem [ref=f1e88]:
+              - link "Team" [ref=f1e89] [cursor=pointer]:
+                - /url: /team
+            - listitem [ref=f1e97]:
+              - link "Roles & permissions" [ref=f1e98] [cursor=pointer]:
+                - /url: /roles
+            - listitem [ref=f1e104]:
+              - link "Notifications" [ref=f1e105] [cursor=pointer]:
+                - /url: /notifications
+            - listitem [ref=f1e111]:
+              - link "Reports" [ref=f1e112] [cursor=pointer]:
+                - /url: /reports
+            - listitem [ref=f1e117]:
+              - link "Settings" [ref=f1e118] [cursor=pointer]:
+                - /url: /settings
+            - listitem [ref=f1e124]:
+              - link "Customer Portal" [ref=f1e125] [cursor=pointer]:
+                - /url: /portal
+        - generic [ref=f1e131]:
+          - generic [ref=f1e132]:
+            - generic [ref=f1e133]: A
+            - generic [ref=f1e134]:
+              - paragraph [ref=f1e135]: Alex Admin
+              - paragraph [ref=f1e136]: CRM Admin
+          - button "Sign out" [ref=f1e137]
+    - main [ref=f1e142]:
+      - generic [ref=f1e384]:
+        - generic [ref=f1e385]:
+          - generic [ref=f1e386]:
+            - heading "Acme Technologies" [level=1] [ref=f1e387]
+            - paragraph [ref=f1e388]: Customer profile
+          - generic [ref=f1e389]:
+            - generic [ref=f1e390]: No level
+            - generic [ref=f1e391]: New
+            - link [ref=f1e392] [cursor=pointer]:
+              - /url: /customers/cmvryvtgy001zx8ooa5c51fx4/edit
+              - button "Edit" [ref=f1e393]
+            - button "Delete" [ref=f1e394]
+        - generic [ref=f1e395]:
+          - generic [ref=f1e396]:
+            - heading "Overview" [level=2] [ref=f1e398]
+            - generic [ref=f1e400]:
+              - generic [ref=f1e401]:
+                - term [ref=f1e402]: Level
+                - definition [ref=f1e403]:
+                  - combobox [ref=f1e404]:
+                    - option "No level" [selected]
+                    - option "Hot"
+                    - option "Warm"
+                    - option "Cold"
+              - generic [ref=f1e405]:
+                - term [ref=f1e406]: Website
+                - definition [ref=f1e407]: —
+              - generic [ref=f1e408]:
+                - term [ref=f1e409]: Assigned officer
+                - definition [ref=f1e410]: Alex Admin
+              - generic [ref=f1e411]:
+                - term [ref=f1e412]: Lead source
+                - definition [ref=f1e413]: Social Media & Ads
+              - generic [ref=f1e414]:
+                - term [ref=f1e415]: Notes
+                - definition [ref=f1e416]: —
+          - generic [ref=f1e417]:
+            - generic [ref=f1e418]:
+              - heading "Contacts" [level=2] [ref=f1e419]
+              - button "Add contact" [ref=f1e420]
+            - list [ref=f1e422]:
+              - listitem [ref=f1e423]:
+                - generic [ref=f1e424]:
+                  - paragraph [ref=f1e425]: John DoePrimary
+                  - paragraph [ref=f1e426]: —
+                - generic [ref=f1e427]:
+                  - generic [ref=f1e428]:
+                    - paragraph [ref=f1e429]: —
+                    - paragraph [ref=f1e430]: —
+                  - generic [ref=f1e431]:
+                    - button "Edit" [ref=f1e432]
+                    - button "Delete" [ref=f1e433]
+          - generic [ref=f1e434]:
+            - generic [ref=f1e435]:
+              - heading "Visits" [level=2] [ref=f1e436]
+              - link [ref=f1e437] [cursor=pointer]:
+                - /url: /visits?new=1&companyId=cmvryvtgy001zx8ooa5c51fx4
+                - button "Log visit" [ref=f1e438]
+            - generic [ref=f1e439]:
+              - paragraph [ref=f1e441]: No visits yet
+              - link "Open visits →" [ref=f1e442] [cursor=pointer]:
+                - /url: /visits
+          - generic [ref=f1e443]:
+            - heading "Business card" [level=2] [ref=f1e445]
+            - generic [ref=f1e447]:
+              - paragraph [ref=f1e448]: No business card scanned
+              - paragraph [ref=f1e449]: Cards scanned from the Scan Card page appear here.
+          - generic [ref=f1e450]:
+            - generic [ref=f1e451]:
+              - heading "Follow-ups" [level=2] [ref=f1e452]
+              - link [ref=f1e453] [cursor=pointer]:
+                - /url: /follow-ups?new=1&companyId=cmvryvtgy001zx8ooa5c51fx4
+                - button "Schedule" [ref=f1e454]
+            - generic [ref=f1e455]:
+              - paragraph [ref=f1e457]: No follow-ups
+              - link "Open follow-ups →" [ref=f1e458] [cursor=pointer]:
+                - /url: /follow-ups?companyId=cmvryvtgy001zx8ooa5c51fx4
+          - generic [ref=f1e459]:
+            - generic [ref=f1e460]:
+              - heading "Opportunities" [level=2] [ref=f1e461]
+              - link [ref=f1e462] [cursor=pointer]:
+                - /url: /opportunities?new=1&companyId=cmvryvtgy001zx8ooa5c51fx4
+                - button "Add" [ref=f1e463]
+            - paragraph [ref=f1e466]: No opportunities
+          - generic [ref=f1e467]:
+            - heading "Tickets & requirements" [level=2] [ref=f1e469]
+            - generic [ref=f1e471]:
+              - generic [ref=f1e472]:
+                - generic [ref=f1e473]:
+                  - paragraph [ref=f1e474]: Tickets
+                  - link [ref=f1e475] [cursor=pointer]:
+                    - /url: /tickets?new=1&companyId=cmvryvtgy001zx8ooa5c51fx4
+                    - button "New ticket" [ref=f1e476]
+                - paragraph [ref=f1e477]: None
+              - generic [ref=f1e478]:
+                - generic [ref=f1e479]:
+                  - paragraph [ref=f1e480]: Requirements
+                  - link [ref=f1e481] [cursor=pointer]:
+                    - /url: /requirements?new=1&companyId=cmvryvtgy001zx8ooa5c51fx4
+                    - button "New requirement" [ref=f1e482]
+                - paragraph [ref=f1e483]: None
+  - button "Open Next.js Dev Tools" [ref=f1e8] [cursor=pointer]
+  - alert [ref=f1e12]

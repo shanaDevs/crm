@@ -19,6 +19,7 @@ import {
   filesRouter,
 } from './routes/misc'
 import { rolesRouter, usersRouter, levelsRouter } from './routes/access'
+import { leadSourcesRouter } from './routes/leadSources'
 import geoRoutes from './routes/geo'
 import { prisma } from './lib/prisma'
 import { requireAuth, requirePermission } from './middleware/auth'
@@ -67,6 +68,7 @@ export function createApp() {
   app.use('/api/team', usersRouter)
   app.use('/api/roles', rolesRouter)
   app.use('/api/customer-levels', levelsRouter)
+  app.use('/api/lead-sources', leadSourcesRouter)
   app.use('/api/settings', settingsRouter)
   app.use('/api/files', filesRouter)
 

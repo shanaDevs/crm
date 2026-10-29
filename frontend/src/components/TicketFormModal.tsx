@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import type { Company, Product, Ticket } from '@/lib/types'
+import type { Company, Product, TeamMember, Ticket } from '@/lib/types'
 import { statusLabel } from '@/lib/format'
 import { Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from '@/components/ui'
 
@@ -16,6 +16,7 @@ function initialForm(ticket?: Ticket | null, presetCompanyId = '') {
     type: ticket?.type || 'SUPPORT',
     priority: ticket?.priority || 'MEDIUM',
     dueDate: ticket?.dueDate?.slice(0, 10) || '',
+    assigneeId: ticket?.assigneeId || ticket?.assignee?.id || '',
   }
 }
 
@@ -34,6 +35,7 @@ export function TicketFormModal({
   const { user, isCustomer } = useAuth()
   const [companies, setCompanies] = useState<Company[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [team, setTeam] = useState<TeamMember[]>([])
   const [form, setForm] = useState(() => initialForm(ticket, presetCompanyId || user?.companyId || ''))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +47,11 @@ export function TicketFormModal({
     if (!isCustomer && !ticket) {
       api<Company[]>('/api/customers')
         .then(setCompanies)
+        .catch(() => undefined)
+    }
+    if (!isCustomer) {
+      api<TeamMember[]>('/api/team')
+        .then((users) => setTeam(users.filter((u) => u.isActive && u.role.code !== 'CUSTOMER')))
         .catch(() => undefined)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,6 +70,7 @@ export function TicketFormModal({
       type: form.type,
       priority: form.priority,
       dueDate: form.dueDate ? new Date(`${form.dueDate}T00:00:00`).toISOString() : null,
+      assigneeId: form.assigneeId || null,
     }
     try {
       const saved = ticket
@@ -131,6 +139,18 @@ export function TicketFormModal({
             </Select>
           </Field>
         </div>
+        {!isCustomer ? (
+          <Field label="Assignee (e.g. Sales person, Developer)">
+            <Select value={form.assigneeId} onChange={(e) => set('assigneeId', e.target.value)}>
+              <option value="">Unassigned</option>
+              {team.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.firstName} {m.lastName} ({m.role?.name || m.role?.code})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
         <Field label="Due date">
           <Input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} />
         </Field>

@@ -3,6 +3,8 @@ import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import {
   opportunityCreateSchema,
+  opportunityStageCreateSchema,
+  opportunityStageUpdateSchema,
   opportunityUpdateSchema,
   productCreateSchema,
   productUpdateSchema,
@@ -90,8 +92,86 @@ opportunitiesRouter.get('/', requirePermission('opportunities.read'), async (req
 })
 
 opportunitiesRouter.get('/stages', requirePermission('opportunities.read'), async (_req, res) => {
-  const stages = await prisma.opportunityStage.findMany({ orderBy: { sortOrder: 'asc' } })
+  const stages = await prisma.opportunityStage.findMany({
+    include: { _count: { select: { opportunities: true } } },
+    orderBy: { sortOrder: 'asc' },
+  })
   return res.json(stages)
+})
+
+opportunitiesRouter.post('/stages', requirePermission('opportunities.write'), async (req, res) => {
+  const parsed = opportunityStageCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+
+  const name = parsed.data.name.trim()
+  let code = (parsed.data.code?.trim() || name)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  if (!code) code = `STAGE_${Date.now()}`
+
+  // Ensure unique code
+  let existing = await prisma.opportunityStage.findUnique({ where: { code } })
+  if (existing) {
+    code = `${code}_${Math.floor(1000 + Math.random() * 9000)}`
+  }
+
+  let sortOrder = parsed.data.sortOrder
+  if (typeof sortOrder !== 'number') {
+    const highest = await prisma.opportunityStage.findFirst({ orderBy: { sortOrder: 'desc' } })
+    sortOrder = (highest?.sortOrder ?? 0) + 1
+  }
+
+  const stage = await prisma.opportunityStage.create({
+    data: {
+      name,
+      code,
+      sortOrder,
+      isWon: parsed.data.isWon ?? false,
+      isLost: parsed.data.isLost ?? false,
+    },
+    include: { _count: { select: { opportunities: true } } },
+  })
+  return res.status(201).json(stage)
+})
+
+opportunitiesRouter.patch('/stages/:id', requirePermission('opportunities.write'), async (req, res) => {
+  const parsed = opportunityStageUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+
+  const id = param(req, 'id')
+  const existing = await prisma.opportunityStage.findUnique({ where: { id } })
+  if (!existing) return res.status(404).json({ error: 'Stage not found' })
+
+  const updated = await prisma.opportunityStage.update({
+    where: { id },
+    data: {
+      name: parsed.data.name?.trim(),
+      sortOrder: parsed.data.sortOrder,
+      isWon: parsed.data.isWon,
+      isLost: parsed.data.isLost,
+    },
+    include: { _count: { select: { opportunities: true } } },
+  })
+  return res.json(updated)
+})
+
+opportunitiesRouter.delete('/stages/:id', requirePermission('opportunities.write'), async (req, res) => {
+  const id = param(req, 'id')
+  const stage = await prisma.opportunityStage.findUnique({
+    where: { id },
+    include: { _count: { select: { opportunities: true } } },
+  })
+  if (!stage) return res.status(404).json({ error: 'Stage not found' })
+
+  if (stage._count.opportunities > 0) {
+    return res.status(400).json({
+      error: `Cannot delete stage "${stage.name}" because it currently contains ${stage._count.opportunities} opportunities. Move or delete them first.`,
+    })
+  }
+
+  await prisma.opportunityStage.delete({ where: { id } })
+  return res.json({ success: true })
 })
 
 opportunitiesRouter.post('/', requirePermission('opportunities.write'), async (req, res) => {
