@@ -17,6 +17,8 @@ permissions:
 
 jobs:
   build-and-push:
+    # Only this repo — skips forks and any other repository that inherits/copies this workflow.
+    if: github.repository == 'shanaDevs/crm'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
