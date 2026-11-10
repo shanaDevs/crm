@@ -22,6 +22,7 @@ import {
   MapPin,
   DoorOpen,
   ShieldCheck,
+  Phone,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { fullName } from '@/lib/format'
@@ -70,6 +71,13 @@ const NAV: NavItem[] = [
     label: 'Follow-ups',
     icon: <CalendarClock size={18} strokeWidth={2} />,
     permission: 'followups.read',
+  },
+  {
+    href: '/calls',
+    label: 'Calling',
+    icon: <Phone size={18} strokeWidth={2} />,
+    permission: 'calls.read',
+    staffOnly: true,
   },
   {
     href: '/products',

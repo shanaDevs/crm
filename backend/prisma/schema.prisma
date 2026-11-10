@@ -69,6 +69,27 @@ enum CallOutcome {
   MEETING_BOOKED
 }
 
+enum CallDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum CallSessionStatus {
+  QUEUED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  FAILED
+  CANCELLED
+}
+
+enum CallDialMode {
+  PHONE
+  SIP_GATEWAY
+  TWILIO
+}
+
 enum OpportunityStageCode {
   NEW
   CONTACTED
@@ -236,6 +257,8 @@ model User {
   followUpsAssigned  FollowUp[]   @relation("FollowUpAssignee")
   followUpsCreated   FollowUp[]   @relation("FollowUpCreatedBy")
   callLogs           CallLog[]
+  callSessionsAssigned CallSession[] @relation("CallSessionAssignee")
+  callSessionsCreated  CallSession[] @relation("CallSessionCreatedBy")
   opportunitiesOwned Opportunity[] @relation("OpportunityOwner")
   requirementsManaged Requirement[] @relation("RequirementManager")
   requirementAssignments Assignment[]
@@ -302,6 +325,7 @@ model Company {
   opportunities         Opportunity[]
   requirements          Requirement[]
   tickets               Ticket[]
+  callSessions          CallSession[]
   customerUsers         User[]                 @relation("CustomerUsers")
   interestedProducts    CompanyProductInterest[]
   customFieldValues     CustomFieldValue[]
@@ -335,6 +359,7 @@ model Contact {
   followUps    FollowUp[]
   requirements Requirement[]
   tickets      Ticket[]
+  callSessions CallSession[]
 
   @@index([companyId])
   @@index([email])
@@ -501,6 +526,7 @@ model FollowUp {
   parentFollowUp  FollowUp?       @relation("FollowUpReschedule", fields: [parentFollowUpId], references: [id])
   childFollowUps  FollowUp[]      @relation("FollowUpReschedule")
   callLogs        CallLog[]
+  callSessions    CallSession[]
   history         ActivityHistory[]
   reminderJobs    ReminderJob[]
   smsMessages     SmsMessage[]
@@ -526,6 +552,44 @@ model CallLog {
 
   @@index([followUpId])
   @@index([loggedById])
+}
+
+model CallSession {
+  id              String            @id @default(cuid())
+  direction       CallDirection
+  status          CallSessionStatus @default(QUEUED)
+  dialMode        CallDialMode
+  companyId       String?
+  contactId       String?
+  followUpId      String?
+  phoneE164       String
+  assigneeId      String?
+  createdById     String?
+  providerCallSid String?
+  providerMeta    Json?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationSec     Int?
+  outcome         CallOutcome?
+  notes           String?
+  recordingKey    String?
+  queuedAt        DateTime          @default(now())
+  claimedAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  followUp        FollowUp?         @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  assignee        User?             @relation("CallSessionAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy       User?             @relation("CallSessionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, queuedAt])
+  @@index([assigneeId, status])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([phoneE164])
+  @@index([providerCallSid])
+  @@index([createdAt])
 }
 
 model ActivityHistory {

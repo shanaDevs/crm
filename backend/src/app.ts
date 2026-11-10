@@ -20,6 +20,7 @@ import {
 } from './routes/misc'
 import { rolesRouter, usersRouter, levelsRouter } from './routes/access'
 import { leadSourcesRouter } from './routes/leadSources'
+import callsRoutes, { callsWebhookRouter } from './routes/calls'
 import geoRoutes from './routes/geo'
 import { prisma } from './lib/prisma'
 import { requireAuth, requirePermission } from './middleware/auth'
@@ -27,7 +28,9 @@ import { requireAuth, requirePermission } from './middleware/auth'
 export function createApp() {
   const app = express()
 
-  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  const corsOrigins = (
+    process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3002'
+  )
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
@@ -36,8 +39,16 @@ export function createApp() {
   app.use(
     cors({
       origin(origin, callback) {
-        // Allow non-browser clients (no Origin) and configured frontends
-        if (!origin || corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+        // Allow non-browser clients (no Origin) and configured frontends.
+        // In development also allow any localhost / 127.0.0.1 port so a
+        // frontend port change (e.g. 3000 → 3002) does not break login.
+        if (
+          !origin ||
+          corsOrigins.includes('*') ||
+          corsOrigins.includes(origin) ||
+          (process.env.NODE_ENV !== 'production' &&
+            /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin))
+        ) {
           return callback(null, true)
         }
         return callback(null, false)
@@ -69,6 +80,8 @@ export function createApp() {
   app.use('/api/roles', rolesRouter)
   app.use('/api/customer-levels', levelsRouter)
   app.use('/api/lead-sources', leadSourcesRouter)
+  app.use('/api/calls/webhooks', callsWebhookRouter)
+  app.use('/api/calls', callsRoutes)
   app.use('/api/settings', settingsRouter)
   app.use('/api/files', filesRouter)
 

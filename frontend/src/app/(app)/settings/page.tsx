@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import type { DialOptions, Product, TeamMember } from '@/lib/types'
+import { fullName } from '@/lib/format'
 import {
   Button,
   Card,
@@ -11,6 +13,7 @@ import {
   Input,
   LoadingState,
   PageHeader,
+  Select,
 } from '@/components/ui'
 
 type SmsStatus = {
@@ -47,6 +50,15 @@ export default function SettingsPage() {
   const [testTo, setTestTo] = useState('')
   const [smsResult, setSmsResult] = useState<string | null>(null)
   const [smsBusy, setSmsBusy] = useState(false)
+  const [calling, setCalling] = useState<DialOptions | null>(null)
+  const [callingMessage, setCallingMessage] = useState<string | null>(null)
+  const [callingBusy, setCallingBusy] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
+  const [team, setTeam] = useState<TeamMember[]>([])
+  const [backfillProductId, setBackfillProductId] = useState('')
+  const [backfillAssigneeId, setBackfillAssigneeId] = useState('')
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   useEffect(() => {
     api<SmsStatus>('/api/settings/sms-status')
@@ -67,7 +79,83 @@ export default function SettingsPage() {
         )
       )
       .catch(() => setAiStatus(null))
-  }, [])
+
+    api<DialOptions>('/api/calls/settings')
+      .then(setCalling)
+      .catch(() => setCalling(null))
+
+    const canSync = isAdmin || can('settings.write')
+    if (canSync) {
+      api<Product[]>('/api/products')
+        .then((list) => setProducts(list.filter((p) => p.isActive !== false)))
+        .catch(() => setProducts([]))
+      api<TeamMember[]>('/api/team')
+        .then((list) => setTeam(list.filter((u) => u.isActive)))
+        .catch(() => setTeam([]))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  async function runOpportunityBackfill() {
+    setSyncBusy(true)
+    setSyncMessage(null)
+    try {
+      const result = await api<{
+        ok: boolean
+        created: number
+        scanned: number
+        skipped: Array<{ name: string; reason: string }>
+      }>('/api/settings/backfill-opportunities', {
+        method: 'POST',
+        body: { productId: backfillProductId || null },
+      })
+      const skipNote = result.skipped.length ? ` · ${result.skipped.length} skipped` : ''
+      setSyncMessage(`Opportunities: created ${result.created} of ${result.scanned} customers without deals${skipNote}.`)
+    } catch (err) {
+      setSyncMessage(err instanceof ApiError ? err.message : 'Opportunity backfill failed')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  async function runAssigneeBackfill() {
+    setSyncBusy(true)
+    setSyncMessage(null)
+    try {
+      const result = await api<{ ok: boolean; updated: number; scanned: number; mode: string }>(
+        '/api/settings/backfill-assignees',
+        {
+          method: 'POST',
+          body: { assigneeId: backfillAssigneeId || null },
+        }
+      )
+      setSyncMessage(
+        `Assignees: assigned ${result.updated} unassigned customers (${result.mode === 'fixed' ? 'one agent' : 'round-robin'}).`
+      )
+    } catch (err) {
+      setSyncMessage(err instanceof ApiError ? err.message : 'Assignee backfill failed')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  async function saveCalling() {
+    if (!calling) return
+    setCallingBusy(true)
+    setCallingMessage(null)
+    try {
+      const next = await api<DialOptions>('/api/calls/settings', {
+        method: 'PUT',
+        body: calling.settings,
+      })
+      setCalling(next)
+      setCallingMessage('Calling settings saved')
+    } catch (err) {
+      setCallingMessage(err instanceof ApiError ? err.message : 'Failed to save calling settings')
+    } finally {
+      setCallingBusy(false)
+    }
+  }
 
   async function saveSetting() {
     setSaving(true)
@@ -213,6 +301,241 @@ export default function SettingsPage() {
           ) : (
             <p className="text-sm text-[var(--muted)]">Only admins can edit system settings.</p>
           )}
+        </Card>
+
+        {(isAdmin || can('settings.write')) && (
+          <Card title="Customer & opportunity sync">
+            <div className="space-y-4 text-sm">
+              <p className="text-[var(--muted)]">
+                Admin tools: create a pipeline opportunity for every customer that has none, and assign every
+                unassigned customer to an agent. Agents can also transfer customers from the customer page.
+              </p>
+              <Field label="Default product for opportunity backfill">
+                <Select value={backfillProductId} onChange={(e) => setBackfillProductId(e.target.value)}>
+                  <option value="">Auto (interested product, else first active)</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Button disabled={syncBusy} onClick={() => void runOpportunityBackfill()}>
+                {syncBusy ? 'Working…' : 'Backfill opportunities'}
+              </Button>
+              <Field label="Assignee for unassigned customers">
+                <Select value={backfillAssigneeId} onChange={(e) => setBackfillAssigneeId(e.target.value)}>
+                  <option value="">Round-robin across all active staff</option>
+                  {team.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {fullName(u)} · {u.role?.name || u.role?.code}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Button variant="secondary" disabled={syncBusy} onClick={() => void runAssigneeBackfill()}>
+                {syncBusy ? 'Working…' : 'Assign unassigned customers'}
+              </Button>
+              {syncMessage ? <p className="text-xs text-[var(--muted)]">{syncMessage}</p> : null}
+            </div>
+          </Card>
+        )}
+
+        <Card title="Calling dial modes">
+          <div className="space-y-4 text-sm">
+            <p className="text-[var(--muted)]">
+              Turn Phone dialer, SIP/SIM gateway, and Twilio on or off. Agents only see enabled modes that are
+              configured.
+            </p>
+            {!calling ? (
+              <p className="text-[var(--muted)]">Calling settings unavailable (need calls.read or settings.read).</p>
+            ) : (
+              <>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={calling.settings.phoneDialer.enabled}
+                    disabled={!can('settings.write')}
+                    onChange={(e) =>
+                      setCalling((c) =>
+                        c
+                          ? {
+                              ...c,
+                              settings: {
+                                ...c.settings,
+                                phoneDialer: { enabled: e.target.checked },
+                              },
+                            }
+                          : c
+                      )
+                    }
+                  />
+                  <span>
+                    A · Phone / SIM dialer{' '}
+                    <span className="text-[var(--muted)]">
+                      ({calling.modes.PHONE.available ? 'available' : 'off'})
+                    </span>
+                  </span>
+                </label>
+
+                <div className="space-y-2 rounded-lg border border-[var(--border)] p-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={calling.settings.sipGateway.enabled}
+                      disabled={!can('settings.write')}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  sipGateway: { ...c.settings.sipGateway, enabled: e.target.checked },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                    />
+                    <span>
+                      B · SIP / SIM gateway{' '}
+                      <span className="text-[var(--muted)]">
+                        (
+                        {calling.modes.SIP_GATEWAY.configured
+                          ? calling.modes.SIP_GATEWAY.available
+                            ? 'available'
+                            : 'enabled but secrets/URL incomplete'
+                          : 'secrets missing in .env'}
+                        )
+                      </span>
+                    </span>
+                  </label>
+                  <Field label="WebSocket URL (wss://…)">
+                    <Input
+                      disabled={!can('settings.write')}
+                      value={calling.settings.sipGateway.wsUrl}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  sipGateway: { ...c.settings.sipGateway, wsUrl: e.target.value },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                      placeholder="wss://gateway.example.com:8089/ws"
+                    />
+                  </Field>
+                  <Field label="SIP domain">
+                    <Input
+                      disabled={!can('settings.write')}
+                      value={calling.settings.sipGateway.sipDomain}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  sipGateway: { ...c.settings.sipGateway, sipDomain: e.target.value },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="STUN (optional)">
+                    <Input
+                      disabled={!can('settings.write')}
+                      value={calling.settings.sipGateway.stun}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  sipGateway: { ...c.settings.sipGateway, stun: e.target.value },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                      placeholder="stun:stun.l.google.com:19302"
+                    />
+                  </Field>
+                </div>
+
+                <div className="space-y-2 rounded-lg border border-[var(--border)] p-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={calling.settings.twilio.enabled}
+                      disabled={!can('settings.write')}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  twilio: { ...c.settings.twilio, enabled: e.target.checked },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                    />
+                    <span>
+                      C · Twilio Voice{' '}
+                      <span className="text-[var(--muted)]">
+                        (
+                        {calling.status.twilioSecrets
+                          ? calling.modes.TWILIO.available
+                            ? 'available'
+                            : 'enabled but incomplete'
+                          : 'TWILIO_* secrets missing in .env'}
+                        )
+                      </span>
+                    </span>
+                  </label>
+                  <Field label="Caller ID / from number">
+                    <Input
+                      disabled={!can('settings.write')}
+                      value={calling.settings.twilio.fromNumber}
+                      onChange={(e) =>
+                        setCalling((c) =>
+                          c
+                            ? {
+                                ...c,
+                                settings: {
+                                  ...c.settings,
+                                  twilio: { ...c.settings.twilio, fromNumber: e.target.value },
+                                },
+                              }
+                            : c
+                        )
+                      }
+                      placeholder="+94771234567"
+                    />
+                  </Field>
+                </div>
+
+                {can('settings.write') ? (
+                  <Button disabled={callingBusy} onClick={() => void saveCalling()}>
+                    {callingBusy ? 'Saving…' : 'Save calling settings'}
+                  </Button>
+                ) : null}
+                {callingMessage ? <p className="text-xs text-[var(--muted)]">{callingMessage}</p> : null}
+              </>
+            )}
+          </div>
         </Card>
 
         <Card title="SMS reminders">

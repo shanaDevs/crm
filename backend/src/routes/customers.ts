@@ -240,6 +240,21 @@ router.patch('/:id', requirePermission('customers.write'), async (req, res) => {
   return res.json(company)
 })
 
+router.post('/:id/transfer', requirePermission('customers.write'), async (req, res) => {
+  const toUserId = typeof req.body?.toUserId === 'string' ? req.body.toUserId : ''
+  if (!toUserId) return res.status(400).json({ error: 'Select an agent to transfer to' })
+  const transferOpportunities = req.body?.transferOpportunities !== false
+  const { transferCustomer } = await import('../services/customerSync')
+  const result = await transferCustomer({
+    companyId: param(req, 'id'),
+    toUserId,
+    transferOpportunities,
+    actorId: req.user!.id,
+  })
+  if (!result.ok) return res.status(result.status || 400).json({ error: result.error })
+  return res.json(result.company)
+})
+
 function contactData(input: z.infer<typeof contactSchema>) {
   return {
     firstName: input.firstName,

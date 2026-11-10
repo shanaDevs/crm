@@ -150,7 +150,7 @@ dashboardRouter.get('/', requirePermission('dashboard.read'), async (req, res) =
 const teamRouter = Router()
 teamRouter.use(requireAuth)
 
-teamRouter.get('/', requirePermission('team.read', 'tickets.write', 'tickets.manage', 'followups.write'), async (_req, res) => {
+teamRouter.get('/', requirePermission('team.read', 'tickets.write', 'tickets.manage', 'followups.write', 'customers.write'), async (_req, res) => {
   const users = await prisma.user.findMany({
     where: { role: { code: { not: RoleCode.CUSTOMER } } },
     select: {
@@ -249,6 +249,29 @@ settingsRouter.get('/ai-status', requirePermission('settings.read'), async (_req
     configured: provider !== 'mock' && hasKey,
     live: provider === 'gemini' && hasKey,
   })
+})
+
+settingsRouter.post('/backfill-opportunities', requirePermission('settings.write'), async (req, res) => {
+  const { backfillOpportunities } = await import('../services/customerSync')
+  const productId = typeof req.body?.productId === 'string' ? req.body.productId : null
+  const result = await backfillOpportunities({
+    productId,
+    fallbackOwnerId: req.user!.id,
+    actorId: req.user!.id,
+  })
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  return res.json(result)
+})
+
+settingsRouter.post('/backfill-assignees', requirePermission('settings.write'), async (req, res) => {
+  const { backfillAssignees } = await import('../services/customerSync')
+  const assigneeId = typeof req.body?.assigneeId === 'string' ? req.body.assigneeId : null
+  const result = await backfillAssignees({
+    assigneeId,
+    actorId: req.user!.id,
+  })
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  return res.json(result)
 })
 
 settingsRouter.post('/test-ai', requirePermission('settings.write'), async (_req, res) => {

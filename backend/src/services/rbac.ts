@@ -11,6 +11,9 @@ export const PERMISSION_CATALOG = [
   { code: 'visits.write', name: 'Record visits', group: 'Visits' },
   { code: 'followups.read', name: 'View follow-ups', group: 'Follow-ups' },
   { code: 'followups.write', name: 'Manage follow-ups', group: 'Follow-ups' },
+  { code: 'calls.read', name: 'View calling desk and call history', group: 'Calling' },
+  { code: 'calls.write', name: 'Place and complete calls', group: 'Calling' },
+  { code: 'calls.manage', name: 'Manage call queue and force-assign', group: 'Calling' },
   { code: 'products.read', name: 'View products', group: 'Products' },
   { code: 'products.write', name: 'Manage products', group: 'Products' },
   { code: 'opportunities.read', name: 'View opportunities', group: 'Opportunities' },
@@ -61,6 +64,9 @@ export const SYSTEM_ROLES: Array<{ name: string; code: RoleCode; description: st
       'visits.write',
       'followups.read',
       'followups.write',
+      'calls.read',
+      'calls.write',
+      'calls.manage',
       'products.read',
       'opportunities.read',
       'opportunities.write',
@@ -110,6 +116,8 @@ export const SYSTEM_ROLES: Array<{ name: string; code: RoleCode; description: st
       'visits.write',
       'followups.read',
       'followups.write',
+      'calls.read',
+      'calls.write',
       'products.read',
       'opportunities.read',
       'opportunities.write',
@@ -211,8 +219,40 @@ export async function ensureRbacDefaults(prisma: PrismaClient) {
     await prisma.customerLevel.createMany({ data: DEFAULT_LEVELS, skipDuplicates: true })
   }
 
-  if ((await prisma.leadSource.count()) === 0) {
+  // Guard: Prisma client may lag behind schema until generate succeeds (DLL lock on Windows).
+  if (prisma.leadSource && (await prisma.leadSource.count()) === 0) {
     await prisma.leadSource.createMany({ data: DEFAULT_LEAD_SOURCES, skipDuplicates: true })
+  }
+
+  // Additive grant so existing sales roles pick up Calling without wiping custom edits.
+  const callingGrants: Array<{ roleName: string; codes: string[] }> = [
+    { roleName: 'Sales Executive', codes: ['calls.read', 'calls.write', 'calls.manage'] },
+    { roleName: 'Marketing Officer', codes: ['calls.read', 'calls.write'] },
+  ]
+  for (const grant of callingGrants) {
+    const role = await prisma.role.findUnique({ where: { name: grant.roleName } })
+    if (!role) continue
+    const ids = grant.codes.map((c) => permIdByCode.get(c)).filter((id): id is string => Boolean(id))
+    if (ids.length) {
+      await prisma.rolePermission.createMany({
+        data: ids.map((permissionId) => ({ roleId: role.id, permissionId })),
+        skipDuplicates: true,
+      })
+    }
+  }
+
+  const existingCalling = await prisma.systemSetting.findUnique({ where: { key: 'calling' } })
+  if (!existingCalling) {
+    await prisma.systemSetting.create({
+      data: {
+        key: 'calling',
+        value: {
+          phoneDialer: { enabled: true },
+          sipGateway: { enabled: false, wsUrl: '', sipDomain: '', stun: '' },
+          twilio: { enabled: false, fromNumber: '' },
+        },
+      },
+    })
   }
 }
 

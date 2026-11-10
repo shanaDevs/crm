@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@twilio/voice-sdk": "^2.18.5",
     "date-fns": "^4.4.0",
+    "jssip": "^3.13.9",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.47.0",
     "next": "16.3.5",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jssip": "^3.5.3",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
     "@types/react": "^19",

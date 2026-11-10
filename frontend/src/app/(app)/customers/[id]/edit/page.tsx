@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import type { Company } from '@/lib/types'
+import type { Company, TeamMember } from '@/lib/types'
+import { fullName } from '@/lib/format'
 import { LevelSelect, useCustomerLevels } from '@/components/levels'
 import { LeadSourceSelect } from '@/components/leadSources'
 import {
@@ -33,6 +34,7 @@ const emptyForm = {
   leadStatus: 'NEW',
   levelId: '' as string | null,
   notes: '',
+  assignedOfficerId: '',
   contactName: '',
   jobTitle: '',
   email: '',
@@ -46,15 +48,20 @@ export default function EditCustomerPage() {
   const { can } = useAuth()
   const { levels } = useCustomerLevels()
   const [form, setForm] = useState(emptyForm)
+  const [team, setTeam] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!params.id) return
-    api<Company>(`/api/customers/${params.id}`)
-      .then((c) => {
+    Promise.all([
+      api<Company>(`/api/customers/${params.id}`),
+      api<TeamMember[]>('/api/team').catch(() => [] as TeamMember[]),
+    ])
+      .then(([c, users]) => {
         const primary = c.contacts?.find((x) => x.isPrimary) || c.contacts?.[0]
+        setTeam(users.filter((u) => u.isActive))
         setForm({
           name: c.name,
           website: c.website || '',
@@ -66,6 +73,7 @@ export default function EditCustomerPage() {
           leadStatus: c.leadStatus || 'NEW',
           levelId: c.level?.id || null,
           notes: c.notes || '',
+          assignedOfficerId: c.assignedOfficer?.id || '',
           contactName: [primary?.firstName, primary?.lastName].filter(Boolean).join(' '),
           jobTitle: primary?.jobTitle || '',
           email: primary?.email || '',
@@ -100,6 +108,7 @@ export default function EditCustomerPage() {
           leadStatus: form.leadStatus,
           levelId: form.levelId || null,
           notes: form.notes || null,
+          assignedOfficerId: form.assignedOfficerId || null,
           primaryContact: {
             firstName,
             lastName: rest.join(' '),
@@ -156,6 +165,16 @@ export default function EditCustomerPage() {
                 value={form.leadSource}
                 onChange={(value) => update('leadSource', value)}
               />
+            </Field>
+            <Field label="Assigned agent">
+              <Select value={form.assignedOfficerId} onChange={(e) => update('assignedOfficerId', e.target.value)}>
+                <option value="">Unassigned</option>
+                {team.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {fullName(u)} · {u.role.name}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="Address">
               <Input value={form.addressLine1} onChange={(e) => update('addressLine1', e.target.value)} />

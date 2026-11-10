@@ -262,6 +262,94 @@ export type NotificationItem = {
   createdAt: string
 }
 
+export type CallDialMode = 'PHONE' | 'SIP_GATEWAY' | 'TWILIO'
+export type CallDirection = 'OUTBOUND' | 'INBOUND'
+export type CallSessionStatus =
+  | 'QUEUED'
+  | 'RINGING'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'MISSED'
+  | 'FAILED'
+  | 'CANCELLED'
+
+export type CallOutcome =
+  | 'CONNECTED'
+  | 'NO_ANSWER'
+  | 'BUSY'
+  | 'WRONG_NUMBER'
+  | 'INTERESTED'
+  | 'NOT_INTERESTED'
+  | 'REQUESTED_ANOTHER_CALL'
+  | 'DEMO_BOOKED'
+  | 'MEETING_BOOKED'
+
+export type CallSession = {
+  id: string
+  direction: CallDirection
+  status: CallSessionStatus
+  dialMode: CallDialMode
+  companyId?: string | null
+  contactId?: string | null
+  followUpId?: string | null
+  phoneE164: string
+  assigneeId?: string | null
+  createdById?: string | null
+  providerCallSid?: string | null
+  startedAt?: string | null
+  endedAt?: string | null
+  durationSec?: number | null
+  outcome?: CallOutcome | null
+  notes?: string | null
+  recordingKey?: string | null
+  queuedAt: string
+  claimedAt?: string | null
+  createdAt: string
+  company?: { id: string; name: string } | null
+  contact?: {
+    id: string
+    firstName: string
+    lastName: string
+    mobile?: string | null
+    phone?: string | null
+    email?: string | null
+  } | null
+  assignee?: { id: string; firstName: string; lastName: string; email?: string } | null
+  createdBy?: { id: string; firstName: string; lastName: string } | null
+}
+
+export type CallLead = {
+  companyId: string
+  companyName: string
+  leadStatus?: string
+  level?: { id: string; name: string; color: string } | null
+  assignedOfficer?: { id: string; firstName: string; lastName: string } | null
+  contact: {
+    id: string
+    firstName: string
+    lastName: string
+    mobile?: string | null
+    phone?: string | null
+    email?: string | null
+    isPrimary?: boolean
+    jobTitle?: string | null
+  }
+  phoneE164: string
+}
+
+export type DialOptions = {
+  settings: {
+    phoneDialer: { enabled: boolean }
+    sipGateway: { enabled: boolean; wsUrl: string; sipDomain: string; stun: string }
+    twilio: { enabled: boolean; fromNumber: string }
+  }
+  modes: Record<
+    CallDialMode,
+    { enabled: boolean; configured: boolean; available: boolean; label: string }
+  >
+  status: { twilioSecrets: boolean; sipSecrets: boolean }
+}
+
 export type TeamMember = {
   id: string
   email: string

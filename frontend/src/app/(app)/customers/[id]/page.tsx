@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api, ApiError, getApiBaseUrl } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import type { BusinessCard, Company, Contact } from '@/lib/types'
+import type { BusinessCard, Company, Contact, TeamMember } from '@/lib/types'
 import { formatDateTime, fullName, statusLabel } from '@/lib/format'
 import { LevelBadge, LevelSelect, useCustomerLevels } from '@/components/levels'
 import {
@@ -19,6 +19,7 @@ import {
   LoadingState,
   Modal,
   PageHeader,
+  Select,
   statusTone,
 } from '@/components/ui'
 
@@ -32,6 +33,10 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [contactModal, setContactModal] = useState<{ contact: Contact | null } | null>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [team, setTeam] = useState<TeamMember[]>([])
+  const [transferToId, setTransferToId] = useState('')
+  const [transferOpps, setTransferOpps] = useState(true)
 
   function load(id: string) {
     return api<Company>(`/api/customers/${id}`)
@@ -43,6 +48,13 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     if (params.id) void load(params.id)
   }, [params.id])
+
+  useEffect(() => {
+    if (!can('customers.write')) return
+    api<TeamMember[]>('/api/team')
+      .then((list) => setTeam(list.filter((u) => u.isActive)))
+      .catch(() => setTeam([]))
+  }, [can])
 
   async function deleteContact(contact: Contact) {
     if (!company || !window.confirm(`Remove contact ${fullName(contact)}?`)) return
@@ -66,6 +78,25 @@ export default function CustomerDetailPage() {
       setCompany({ ...company, levelId, level: levels.find((l) => l.id === levelId) || null })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to update level')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onTransfer(e: FormEvent) {
+    e.preventDefault()
+    if (!company || !transferToId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const updated = await api<Company>(`/api/customers/${company.id}/transfer`, {
+        method: 'POST',
+        body: { toUserId: transferToId, transferOpportunities: transferOpps },
+      })
+      setCompany(updated)
+      setTransferOpen(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to transfer customer')
     } finally {
       setBusy(false)
     }
@@ -109,6 +140,18 @@ export default function CustomerDetailPage() {
             <LevelBadge level={company.level} />
             <Badge tone={statusTone(company.leadStatus)}>{statusLabel(company.leadStatus)}</Badge>
             {can('customers.write') ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setTransferToId(company.assignedOfficer?.id || '')
+                  setTransferOpen(true)
+                }}
+              >
+                Transfer
+              </Button>
+            ) : null}
+            {can('customers.write') ? (
               <Link href={`/customers/${company.id}/edit`}>
                 <Button size="sm" variant="secondary">
                   Edit
@@ -144,7 +187,21 @@ export default function CustomerDetailPage() {
             </div>
             <div>
               <dt className="text-[var(--muted)]">Assigned officer</dt>
-              <dd>{fullName(company.assignedOfficer)}</dd>
+              <dd className="flex flex-wrap items-center gap-2">
+                <span>{fullName(company.assignedOfficer) || 'Unassigned'}</span>
+                {can('customers.write') ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setTransferToId(company.assignedOfficer?.id || '')
+                      setTransferOpen(true)
+                    }}
+                  >
+                    Change
+                  </Button>
+                ) : null}
+              </dd>
             </div>
             <div>
               <dt className="text-[var(--muted)]">Lead source</dt>
@@ -214,6 +271,36 @@ export default function CustomerDetailPage() {
             }}
           />
         ) : null}
+
+        <Modal open={transferOpen} title="Transfer customer" onClose={() => setTransferOpen(false)}>
+          <form onSubmit={onTransfer} className="space-y-3">
+            <p className="text-sm text-[var(--muted)]">
+              Move this customer to another agent. Opportunity ownership can move with it.
+            </p>
+            <Field label="Assign to">
+              <Select required value={transferToId} onChange={(e) => setTransferToId(e.target.value)}>
+                <option value="">Select agent</option>
+                {team.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {fullName(u)} · {u.role.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[var(--primary)]"
+                checked={transferOpps}
+                onChange={(e) => setTransferOpps(e.target.checked)}
+              />
+              Also transfer opportunity ownership
+            </label>
+            <Button type="submit" className="w-full" disabled={busy || !transferToId}>
+              {busy ? 'Transferring…' : 'Transfer'}
+            </Button>
+          </form>
+        </Modal>
 
         <Card title="Visits" className="lg:col-span-3" action={addLink('/visits', 'visits.write', 'Log visit')}>
           {!company.visits?.length ? (
