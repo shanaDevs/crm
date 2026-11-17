@@ -98,7 +98,9 @@ type RequestOptions = {
 }
 
 export async function api<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, formData, headers = {}, auth = true } = options
+  const { body, formData, headers = {}, auth = true } = options
+  // FormData / JSON bodies must not use GET/HEAD — browsers reject that.
+  const method = options.method || (formData || body !== undefined ? 'POST' : 'GET')
   const API_URL = getApiBaseUrl()
   const url = path.startsWith('http') ? path : `${API_URL}${path.startsWith('/api') ? path : `/api${path}`}`
 
