@@ -12,8 +12,8 @@ const loginInputClass =
 export default function LoginPage() {
   const { login, user, loading, isCustomer } = useAuth()
   const router = useRouter()
-  const [email, setEmail] = useState('admin@crmtool.local')
-  const [password, setPassword] = useState('Password123!')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -71,11 +71,6 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
-        <div className="mt-6 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-3 text-xs text-neutral-400">
-          Demo: admin@crmtool.local · manager@crmtool.local · marketing@crmtool.local · dev@crmtool.local
-          <br />
-          Password: Password123!
-        </div>
       </div>
     </div>
   )
