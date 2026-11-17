@@ -231,6 +231,23 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
     sipUaRef.current = null
   }, [])
 
+  const markAnswered = useCallback(async (providerCallSid?: string | null) => {
+    const sessionId = activeIdRef.current
+    if (!sessionId) return null
+    try {
+      const updated = await api<CallSession>(`/api/calls/${sessionId}/answered`, {
+        method: 'POST',
+        body: providerCallSid ? { providerCallSid } : {},
+      })
+      setActive(updated)
+      if (!startedAtRef.current) startedAtRef.current = Date.now()
+      return updated
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update call status')
+      return null
+    }
+  }, [])
+
   const connectPhone = useCallback(
     async (session: CallSession) => {
       window.location.href = `tel:${session.phoneE164}`
@@ -238,11 +255,11 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       setActive(updated)
       setActiveId(updated.id)
       activeIdRef.current = updated.id
-      startedAtRef.current = Date.now()
-      // Native dialer: capture mic as best-effort local recording.
+      // Native dialer can't report answer events; treat dial+mic as in progress.
+      void markAnswered()
       void startMicRecording()
     },
-    [startMicRecording],
+    [markAnswered, startMicRecording],
   )
 
   const connectTwilio = useCallback(
@@ -265,7 +282,6 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       setActive(updated)
       setActiveId(updated.id)
       activeIdRef.current = updated.id
-      startedAtRef.current = Date.now()
 
       const beginTwilioRec = () => {
         const local = typeof call.getLocalStream === 'function' ? call.getLocalStream() : null
@@ -274,14 +290,28 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         if (streams.length) void startRecordingFromStreams(streams)
         else void startMicRecording()
       }
-      call.on('accept', beginTwilioRec)
-      // Some connects already have media; try immediately too.
-      beginTwilioRec()
+
+      const onAnswered = () => {
+        void markAnswered(call.parameters.CallSid)
+        beginTwilioRec()
+      }
+
+      call.on('ringing', () => {
+        setActive((prev) => (prev ? { ...prev, status: 'RINGING' } : prev))
+      })
+      call.on('accept', onAnswered)
       call.on('disconnect', () => {
         twilioCallRef.current = null
+        setActive((prev) => (prev && prev.status === 'IN_PROGRESS' ? { ...prev, status: 'IN_PROGRESS' } : prev))
+      })
+      call.on('cancel', () => {
+        setActive((prev) => (prev ? { ...prev, status: 'CANCELLED' } : prev))
+      })
+      call.on('reject', () => {
+        setActive((prev) => (prev ? { ...prev, status: 'MISSED' } : prev))
       })
     },
-    [startMicRecording, startRecordingFromStreams],
+    [markAnswered, startMicRecording, startRecordingFromStreams],
   )
 
   const connectSip = useCallback(
@@ -333,7 +363,6 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       setActive(updated)
       setActiveId(updated.id)
       activeIdRef.current = updated.id
-      startedAtRef.current = Date.now()
 
       const beginSipRec = () => {
         const pc = rtcSession.connection as RTCPeerConnection | undefined
@@ -349,11 +378,26 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         if (streams.length) void startRecordingFromStreams(streams)
         else void startMicRecording()
       }
+
+      const onAnswered = () => {
+        void markAnswered()
+        beginSipRec()
+      }
+
+      rtcSession.on('progress', () => {
+        setActive((prev) => (prev ? { ...prev, status: 'RINGING' } : prev))
+      })
       rtcSession.on('peerconnection', beginSipRec)
-      rtcSession.on('accepted', beginSipRec)
-      rtcSession.on('confirmed', beginSipRec)
+      rtcSession.on('accepted', onAnswered)
+      rtcSession.on('confirmed', onAnswered)
+      rtcSession.on('ended', () => {
+        setActive((prev) => (prev ? { ...prev, status: prev.status === 'RINGING' ? 'MISSED' : prev.status } : prev))
+      })
+      rtcSession.on('failed', () => {
+        setActive((prev) => (prev ? { ...prev, status: 'FAILED' } : prev))
+      })
     },
-    [startMicRecording, startRecordingFromStreams],
+    [markAnswered, startMicRecording, startRecordingFromStreams],
   )
 
   const beginDial = useCallback(
@@ -365,6 +409,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       setOutcome('CONNECTED')
       setNotes(session.notes || '')
       activeIdRef.current = session.id
+      startedAtRef.current = null
       if (session.dialMode === 'PHONE') await connectPhone(session)
       else if (session.dialMode === 'TWILIO') await connectTwilio(session)
       else if (session.dialMode === 'SIP_GATEWAY') await connectSip(session)
@@ -478,6 +523,19 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
             ? 'Recording failed'
             : 'Recording will start automatically'
 
+  const statusLabel =
+    active?.status === 'RINGING'
+      ? 'Ringing…'
+      : active?.status === 'IN_PROGRESS'
+        ? 'In progress (answered)'
+        : active?.status === 'MISSED'
+          ? 'No answer / missed'
+          : active?.status === 'FAILED'
+            ? 'Call failed'
+            : active?.status === 'CANCELLED'
+              ? 'Cancelled'
+              : active?.status || ''
+
   return (
     <CallDeskContext.Provider value={value}>
       {children}
@@ -486,7 +544,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                {active.direction} · {active.dialMode.replace('_', ' ')} · {active.status}
+                {active.direction} · {active.dialMode.replace('_', ' ')} · {statusLabel}
               </p>
               <p className="text-sm font-semibold">
                 {active.company?.name || 'Unknown company'}{' '}

@@ -495,7 +495,8 @@ router.post('/outbound', requirePermission('calls.write'), async (req, res) => {
       createdById: req.user!.id,
       assigneeId: queue ? null : req.user!.id,
       claimedAt: queue ? null : new Date(),
-      startedAt: queue ? null : new Date(),
+      // Talk timer starts when the callee answers (see /:id/answered).
+      startedAt: null,
     },
     include: callSessionInclude,
   })
@@ -593,6 +594,38 @@ router.post('/:id/start', requirePermission('calls.write'), async (req, res) => 
   const id = param(req, 'id')
   const existing = await prisma.callSession.findUnique({ where: { id } })
   if (!existing) return res.status(404).json({ error: 'Not found' })
+  const providerCallSid = typeof req.body?.providerCallSid === 'string' ? req.body.providerCallSid : undefined
+  // Dialing has begun — stay RINGING until the callee answers.
+  const updated = await prisma.callSession.update({
+    where: { id },
+    data: {
+      status:
+        existing.status === CallSessionStatus.COMPLETED ||
+        existing.status === CallSessionStatus.CANCELLED ||
+        existing.status === CallSessionStatus.FAILED ||
+        existing.status === CallSessionStatus.MISSED
+          ? existing.status
+          : CallSessionStatus.RINGING,
+      assigneeId: existing.assigneeId || req.user!.id,
+      providerCallSid: providerCallSid || existing.providerCallSid,
+    },
+    include: callSessionInclude,
+  })
+  return res.json(updated)
+})
+
+router.post('/:id/answered', requirePermission('calls.write'), async (req, res) => {
+  const id = param(req, 'id')
+  const existing = await prisma.callSession.findUnique({ where: { id } })
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+  if (
+    existing.status === CallSessionStatus.COMPLETED ||
+    existing.status === CallSessionStatus.CANCELLED ||
+    existing.status === CallSessionStatus.FAILED ||
+    existing.status === CallSessionStatus.MISSED
+  ) {
+    return res.json(await loadSession(id))
+  }
   const providerCallSid = typeof req.body?.providerCallSid === 'string' ? req.body.providerCallSid : undefined
   const updated = await prisma.callSession.update({
     where: { id },
