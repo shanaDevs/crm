@@ -13,7 +13,7 @@ import { Device, Call as TwilioCall } from '@twilio/voice-sdk'
 import JsSIP from 'jssip'
 import { api } from '@/lib/api'
 import type { CallDialMode, CallOutcome, CallSession, DialOptions } from '@/lib/types'
-import { Button, ErrorBanner, Field, Input, Select, Textarea } from '@/components/ui'
+import { Button, ErrorBanner, Field, Select, Textarea } from '@/components/ui'
 
 const OUTCOMES: { value: CallOutcome; label: string }[] = [
   { value: 'CONNECTED', label: 'Connected' },
@@ -48,7 +48,35 @@ type CallDeskContextValue = {
   clearError: () => void
 }
 
+type ActiveRecording = {
+  recorder: MediaRecorder
+  chunks: Blob[]
+  stopTracks: () => void
+}
+
 const CallDeskContext = createContext<CallDeskContextValue | undefined>(undefined)
+
+function pickRecorderMime() {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+  for (const type of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) return type
+  }
+  return ''
+}
+
+async function mixStreams(streams: MediaStream[]) {
+  const tracks = streams.flatMap((s) => s.getAudioTracks()).filter((t) => t.readyState === 'live')
+  if (tracks.length === 0) return null
+  if (tracks.length === 1) return new MediaStream([tracks[0]])
+
+  const audioCtx = new AudioContext()
+  const dest = audioCtx.createMediaStreamDestination()
+  for (const track of tracks) {
+    const src = audioCtx.createMediaStreamSource(new MediaStream([track]))
+    src.connect(dest)
+  }
+  return { stream: dest.stream, audioCtx }
+}
 
 export function CallDeskProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<CallSession | null>(null)
@@ -57,11 +85,17 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
   const [outcome, setOutcome] = useState<CallOutcome>('CONNECTED')
   const [notes, setNotes] = useState('')
   const [completing, setCompleting] = useState(false)
+  const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'uploading' | 'saved' | 'failed'>(
+    'idle',
+  )
   const twilioDeviceRef = useRef<Device | null>(null)
   const twilioCallRef = useRef<TwilioCall | null>(null)
   const sipUaRef = useRef<InstanceType<typeof JsSIP.UA> | null>(null)
-  const sipSessionRef = useRef<{ terminate: () => void } | null>(null)
+  const sipSessionRef = useRef<{ terminate: () => void; connection?: RTCPeerConnection } | null>(null)
   const startedAtRef = useRef<number | null>(null)
+  const activeIdRef = useRef<string | null>(null)
+  const recordingRef = useRef<ActiveRecording | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const refreshDialOptions = useCallback(async () => {
@@ -73,6 +107,102 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       return null
     }
   }, [])
+
+  const stopRecordingTracks = useCallback(() => {
+    recordingRef.current?.stopTracks()
+    recordingRef.current = null
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close().catch(() => undefined)
+      audioCtxRef.current = null
+    }
+  }, [])
+
+  const startRecordingFromStreams = useCallback(async (streams: MediaStream[]) => {
+    if (recordingRef.current) return
+    const mixed = await mixStreams(streams)
+    if (!mixed) return
+
+    let stream: MediaStream
+    if (mixed instanceof MediaStream) {
+      stream = mixed
+    } else {
+      stream = mixed.stream
+      audioCtxRef.current = mixed.audioCtx
+    }
+
+    const mimeType = pickRecorderMime()
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+    const chunks: Blob[] = []
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data)
+    }
+    recordingRef.current = {
+      recorder,
+      chunks,
+      stopTracks: () => {
+        stream.getTracks().forEach((t) => t.stop())
+      },
+    }
+    recorder.start(1000)
+    setRecordingStatus('recording')
+  }, [])
+
+  const startMicRecording = useCallback(async () => {
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      await startRecordingFromStreams([mic])
+    } catch (err) {
+      setRecordingStatus('failed')
+      setError(err instanceof Error ? err.message : 'Microphone permission is required to record the call')
+    }
+  }, [startRecordingFromStreams])
+
+  const finalizeRecordingUpload = useCallback(async () => {
+    const current = recordingRef.current
+    const sessionId = activeIdRef.current
+    if (!current || !sessionId) {
+      stopRecordingTracks()
+      return null
+    }
+
+    setRecordingStatus('uploading')
+    const blob: Blob | null = await new Promise((resolve) => {
+      const { recorder, chunks } = current
+      if (recorder.state === 'inactive') {
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null)
+        return
+      }
+      recorder.onstop = () => {
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null)
+      }
+      try {
+        recorder.stop()
+      } catch {
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null)
+      }
+    })
+
+    stopRecordingTracks()
+    if (!blob || blob.size === 0) {
+      setRecordingStatus('failed')
+      return null
+    }
+
+    try {
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      const file = new File([blob], `call-${sessionId}.${ext}`, { type: blob.type || 'audio/webm' })
+      const body = new FormData()
+      body.append('file', file)
+      const updated = await api<CallSession>(`/api/calls/${sessionId}/recording`, { formData: body })
+      setActive(updated)
+      setRecordingStatus('saved')
+      return updated
+    } catch (err) {
+      setRecordingStatus('failed')
+      setError(err instanceof Error ? err.message : 'Recording upload failed')
+      return null
+    }
+  }, [stopRecordingTracks])
 
   const clearProviders = useCallback(() => {
     try {
@@ -101,100 +231,146 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
     sipUaRef.current = null
   }, [])
 
-  const connectPhone = useCallback(async (session: CallSession) => {
-    window.location.href = `tel:${session.phoneE164}`
-    const updated = await api<CallSession>(`/api/calls/${session.id}/start`, { method: 'POST' })
-    setActive(updated)
-    setActiveId(updated.id)
-    startedAtRef.current = Date.now()
-  }, [])
+  const connectPhone = useCallback(
+    async (session: CallSession) => {
+      window.location.href = `tel:${session.phoneE164}`
+      const updated = await api<CallSession>(`/api/calls/${session.id}/start`, { method: 'POST' })
+      setActive(updated)
+      setActiveId(updated.id)
+      activeIdRef.current = updated.id
+      startedAtRef.current = Date.now()
+      // Native dialer: capture mic as best-effort local recording.
+      void startMicRecording()
+    },
+    [startMicRecording],
+  )
 
-  const connectTwilio = useCallback(async (session: CallSession) => {
-    const tokenRes = await api<{ token: string; identity: string; fromNumber: string | null }>(
-      '/api/calls/token/twilio',
-      { method: 'POST' }
-    )
-    const device = new Device(tokenRes.token, { logLevel: 1 })
-    await device.register()
-    twilioDeviceRef.current = device
-    const call = await device.connect({
-      params: { To: session.phoneE164, sessionId: session.id },
-    })
-    twilioCallRef.current = call
-    const updated = await api<CallSession>(`/api/calls/${session.id}/start`, {
-      method: 'POST',
-      body: { providerCallSid: call.parameters.CallSid },
-    })
-    setActive(updated)
-    setActiveId(updated.id)
-    startedAtRef.current = Date.now()
-    call.on('disconnect', () => {
-      twilioCallRef.current = null
-    })
-  }, [])
-
-  const connectSip = useCallback(async (session: CallSession) => {
-    const cfg = await api<{
-      wsUrl: string
-      sipDomain: string
-      stun: string
-      username: string
-      password: string
-    }>('/api/calls/token/sip')
-    if (!cfg.wsUrl || !cfg.username) throw new Error('SIP gateway is not fully configured')
-
-    const socket = new JsSIP.WebSocketInterface(cfg.wsUrl)
-    const uri = cfg.sipDomain.includes('@')
-      ? cfg.sipDomain
-      : `sip:${cfg.username}@${cfg.sipDomain || new URL(cfg.wsUrl).hostname}`
-    const ua = new JsSIP.UA({
-      sockets: [socket],
-      uri,
-      password: cfg.password,
-      session_timers: false,
-    })
-    sipUaRef.current = ua
-
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('SIP registration timed out')), 15000)
-      ua.on('registered', () => {
-        clearTimeout(t)
-        resolve()
+  const connectTwilio = useCallback(
+    async (session: CallSession) => {
+      const tokenRes = await api<{ token: string; identity: string; fromNumber: string | null }>(
+        '/api/calls/token/twilio',
+        { method: 'POST' },
+      )
+      const device = new Device(tokenRes.token, { logLevel: 1 })
+      await device.register()
+      twilioDeviceRef.current = device
+      const call = await device.connect({
+        params: { To: session.phoneE164, sessionId: session.id },
       })
-      ua.on('registrationFailed', (e: { cause?: string }) => {
-        clearTimeout(t)
-        reject(new Error(e.cause || 'SIP registration failed'))
+      twilioCallRef.current = call
+      const updated = await api<CallSession>(`/api/calls/${session.id}/start`, {
+        method: 'POST',
+        body: { providerCallSid: call.parameters.CallSid },
       })
-      ua.start()
-    })
+      setActive(updated)
+      setActiveId(updated.id)
+      activeIdRef.current = updated.id
+      startedAtRef.current = Date.now()
 
-    const target = session.phoneE164.startsWith('sip:')
-      ? session.phoneE164
-      : `sip:${session.phoneE164.replace(/^\+/, '')}@${cfg.sipDomain || new URL(cfg.wsUrl).hostname}`
+      const beginTwilioRec = () => {
+        const local = typeof call.getLocalStream === 'function' ? call.getLocalStream() : null
+        const remote = typeof call.getRemoteStream === 'function' ? call.getRemoteStream() : null
+        const streams = [local, remote].filter(Boolean) as MediaStream[]
+        if (streams.length) void startRecordingFromStreams(streams)
+        else void startMicRecording()
+      }
+      call.on('accept', beginTwilioRec)
+      // Some connects already have media; try immediately too.
+      beginTwilioRec()
+      call.on('disconnect', () => {
+        twilioCallRef.current = null
+      })
+    },
+    [startMicRecording, startRecordingFromStreams],
+  )
 
-    const rtcSession = ua.call(target, {
-      mediaConstraints: { audio: true, video: false },
-      pcConfig: cfg.stun ? { iceServers: [{ urls: cfg.stun }] } : undefined,
-    })
-    sipSessionRef.current = rtcSession
-    const updated = await api<CallSession>(`/api/calls/${session.id}/start`, { method: 'POST' })
-    setActive(updated)
-    setActiveId(updated.id)
-    startedAtRef.current = Date.now()
-  }, [])
+  const connectSip = useCallback(
+    async (session: CallSession) => {
+      const cfg = await api<{
+        wsUrl: string
+        sipDomain: string
+        stun: string
+        username: string
+        password: string
+      }>('/api/calls/token/sip')
+      if (!cfg.wsUrl || !cfg.username) throw new Error('SIP gateway is not fully configured')
+
+      const socket = new JsSIP.WebSocketInterface(cfg.wsUrl)
+      const uri = cfg.sipDomain.includes('@')
+        ? cfg.sipDomain
+        : `sip:${cfg.username}@${cfg.sipDomain || new URL(cfg.wsUrl).hostname}`
+      const ua = new JsSIP.UA({
+        sockets: [socket],
+        uri,
+        password: cfg.password,
+        session_timers: false,
+      })
+      sipUaRef.current = ua
+
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('SIP registration timed out')), 15000)
+        ua.on('registered', () => {
+          clearTimeout(t)
+          resolve()
+        })
+        ua.on('registrationFailed', (e: { cause?: string }) => {
+          clearTimeout(t)
+          reject(new Error(e.cause || 'SIP registration failed'))
+        })
+        ua.start()
+      })
+
+      const target = session.phoneE164.startsWith('sip:')
+        ? session.phoneE164
+        : `sip:${session.phoneE164.replace(/^\+/, '')}@${cfg.sipDomain || new URL(cfg.wsUrl).hostname}`
+
+      const rtcSession = ua.call(target, {
+        mediaConstraints: { audio: true, video: false },
+        pcConfig: cfg.stun ? { iceServers: [{ urls: cfg.stun }] } : undefined,
+      })
+      sipSessionRef.current = rtcSession
+      const updated = await api<CallSession>(`/api/calls/${session.id}/start`, { method: 'POST' })
+      setActive(updated)
+      setActiveId(updated.id)
+      activeIdRef.current = updated.id
+      startedAtRef.current = Date.now()
+
+      const beginSipRec = () => {
+        const pc = rtcSession.connection as RTCPeerConnection | undefined
+        if (!pc) {
+          void startMicRecording()
+          return
+        }
+        const streams: MediaStream[] = []
+        const local = new MediaStream(pc.getSenders().map((s) => s.track).filter(Boolean) as MediaStreamTrack[])
+        const remote = new MediaStream(pc.getReceivers().map((r) => r.track).filter(Boolean) as MediaStreamTrack[])
+        if (local.getAudioTracks().length) streams.push(local)
+        if (remote.getAudioTracks().length) streams.push(remote)
+        if (streams.length) void startRecordingFromStreams(streams)
+        else void startMicRecording()
+      }
+      rtcSession.on('peerconnection', beginSipRec)
+      rtcSession.on('accepted', beginSipRec)
+      rtcSession.on('confirmed', beginSipRec)
+    },
+    [startMicRecording, startRecordingFromStreams],
+  )
 
   const beginDial = useCallback(
     async (session: CallSession) => {
       clearProviders()
+      stopRecordingTracks()
       setError(null)
+      setRecordingStatus('idle')
       setOutcome('CONNECTED')
       setNotes(session.notes || '')
+      activeIdRef.current = session.id
       if (session.dialMode === 'PHONE') await connectPhone(session)
       else if (session.dialMode === 'TWILIO') await connectTwilio(session)
       else if (session.dialMode === 'SIP_GATEWAY') await connectSip(session)
       else throw new Error('Unknown dial mode')
     },
-    [clearProviders, connectPhone, connectSip, connectTwilio]
+    [clearProviders, connectPhone, connectSip, connectTwilio, stopRecordingTracks],
   )
 
   const startOutbound = useCallback(
@@ -214,7 +390,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       await beginDial(session)
       return session
     },
-    [beginDial]
+    [beginDial],
   )
 
   const claimAndOpen = useCallback(
@@ -226,12 +402,13 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       await beginDial(claimed)
       return claimed
     },
-    [beginDial]
+    [beginDial],
   )
 
   const hangup = useCallback(async () => {
     clearProviders()
-  }, [clearProviders])
+    await finalizeRecordingUpload()
+  }, [clearProviders, finalizeRecordingUpload])
 
   const completeActive = useCallback(
     async (selectedOutcome: CallOutcome, selectedNotes: string) => {
@@ -239,6 +416,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       setCompleting(true)
       try {
         clearProviders()
+        await finalizeRecordingUpload()
         const durationSec =
           startedAtRef.current != null ? Math.round((Date.now() - startedAtRef.current) / 1000) : undefined
         const opportunityId = active.opportunityId
@@ -248,7 +426,9 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         })
         setActive(null)
         setActiveId(null)
+        activeIdRef.current = null
         startedAtRef.current = null
+        setRecordingStatus('idle')
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('crm:call-completed', {
@@ -260,16 +440,8 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         setCompleting(false)
       }
     },
-    [active, clearProviders]
+    [active, clearProviders, finalizeRecordingUpload],
   )
-
-  async function uploadRecording(file: File) {
-    if (!activeId) return
-    const body = new FormData()
-    body.append('file', file)
-    const updated = await api<CallSession>(`/api/calls/${activeId}/recording`, { formData: body })
-    setActive(updated)
-  }
 
   const value = useMemo<CallDeskContextValue>(
     () => ({
@@ -292,8 +464,19 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       hangup,
       completeActive,
       error,
-    ]
+    ],
   )
+
+  const recordingLabel =
+    recordingStatus === 'recording'
+      ? 'Recording…'
+      : recordingStatus === 'uploading'
+        ? 'Uploading recording…'
+        : recordingStatus === 'saved' || active?.recordingKey
+          ? 'Recording saved to CRM'
+          : recordingStatus === 'failed'
+            ? 'Recording failed'
+            : 'Recording will start automatically'
 
   return (
     <CallDeskContext.Provider value={value}>
@@ -320,6 +503,17 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
             </Button>
           </div>
           <ErrorBanner message={error} />
+          <p
+            className={`mb-2 text-xs ${
+              recordingStatus === 'failed'
+                ? 'text-red-600'
+                : recordingStatus === 'saved' || active.recordingKey
+                  ? 'text-emerald-700'
+                  : 'text-[var(--muted)]'
+            }`}
+          >
+            {recordingLabel}
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Outcome">
               <Select value={outcome} onChange={(e) => setOutcome(e.target.value as CallOutcome)}>
@@ -334,33 +528,16 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
           </div>
-          <Field label="Upload recording (optional)">
-            <Input
-              type="file"
-              accept="audio/*,.mp3,.wav,.webm,.m4a"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  void uploadRecording(file).catch((err) =>
-                    setError(err instanceof Error ? err.message : 'Recording upload failed')
-                  )
-                }
-              }}
-            />
-          </Field>
-          {active.recordingKey ? (
-            <p className="text-xs text-emerald-700">Recording attached.</p>
-          ) : null}
           <Button
             className="mt-3 w-full"
-            disabled={completing}
+            disabled={completing || recordingStatus === 'uploading'}
             onClick={() =>
               void completeActive(outcome, notes).catch((err) =>
-                setError(err instanceof Error ? err.message : 'Failed to complete call')
+                setError(err instanceof Error ? err.message : 'Failed to complete call'),
               )
             }
           >
-            {completing ? 'Saving…' : 'Complete & save to CRM'}
+            {completing || recordingStatus === 'uploading' ? 'Saving…' : 'Complete & save to CRM'}
           </Button>
         </div>
       ) : null}
