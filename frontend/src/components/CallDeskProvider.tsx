@@ -193,7 +193,10 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
       const file = new File([blob], `call-${sessionId}.${ext}`, { type: blob.type || 'audio/webm' })
       const body = new FormData()
       body.append('file', file)
-      const updated = await api<CallSession>(`/api/calls/${sessionId}/recording`, { formData: body })
+      const updated = await api<CallSession>(`/api/calls/${sessionId}/recording`, {
+        method: 'POST',
+        formData: body,
+      })
       setActive(updated)
       setRecordingStatus('saved')
       return updated
