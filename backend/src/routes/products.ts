@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import {
@@ -78,10 +79,48 @@ opportunitiesRouter.use(requireAuth)
 
 opportunitiesRouter.get('/', requirePermission('opportunities.read'), async (req, res) => {
   const productId = req.query.productId ? String(req.query.productId) : undefined
+  const q = req.query.q ? String(req.query.q).trim() : ''
+  const area = req.query.area ? String(req.query.area).trim() : ''
+
+  const where: Prisma.OpportunityWhereInput = {}
+  if (productId) where.productId = productId
+  if (area) {
+    where.company = {
+      OR: [
+        { city: { equals: area, mode: 'insensitive' } },
+        { state: { equals: area, mode: 'insensitive' } },
+        { country: { equals: area, mode: 'insensitive' } },
+      ],
+    }
+  }
+  if (q) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      {
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { notes: { contains: q, mode: 'insensitive' } },
+          { company: { name: { contains: q, mode: 'insensitive' } } },
+          { company: { city: { contains: q, mode: 'insensitive' } } },
+          { company: { state: { contains: q, mode: 'insensitive' } } },
+          { company: { country: { contains: q, mode: 'insensitive' } } },
+          { company: { addressLine1: { contains: q, mode: 'insensitive' } } },
+          { product: { name: { contains: q, mode: 'insensitive' } } },
+        ],
+      },
+    ]
+  }
+
   const opportunities = await prisma.opportunity.findMany({
-    where: productId ? { productId } : undefined,
+    where: Object.keys(where).length ? where : undefined,
     include: {
-      company: true,
+      company: {
+        include: {
+          contacts: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          },
+        },
+      },
       product: true,
       stage: true,
       owner: { select: { id: true, firstName: true, lastName: true } },
@@ -92,6 +131,11 @@ opportunitiesRouter.get('/', requirePermission('opportunities.read'), async (req
 })
 
 opportunitiesRouter.get('/stages', requirePermission('opportunities.read'), async (_req, res) => {
+  await prisma.opportunityStage.upsert({
+    where: { code: 'FIRST_CALL' },
+    create: { code: 'FIRST_CALL', name: '1st Call', sortOrder: 2 },
+    update: { name: '1st Call' },
+  })
   const stages = await prisma.opportunityStage.findMany({
     include: { _count: { select: { opportunities: true } } },
     orderBy: { sortOrder: 'asc' },

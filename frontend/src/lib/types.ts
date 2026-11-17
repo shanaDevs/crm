@@ -292,6 +292,7 @@ export type CallSession = {
   companyId?: string | null
   contactId?: string | null
   followUpId?: string | null
+  opportunityId?: string | null
   phoneE164: string
   assigneeId?: string | null
   createdById?: string | null
@@ -314,6 +315,7 @@ export type CallSession = {
     phone?: string | null
     email?: string | null
   } | null
+  opportunity?: { id: string; title: string; stageId?: string } | null
   assignee?: { id: string; firstName: string; lastName: string; email?: string } | null
   createdBy?: { id: string; firstName: string; lastName: string } | null
 }

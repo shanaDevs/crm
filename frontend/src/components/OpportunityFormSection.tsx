@@ -8,6 +8,7 @@ import { Card, Field, Input, Select, Textarea } from '@/components/ui'
 
 const DEFAULT_STAGES = [
   { code: 'NEW', name: 'New' },
+  { code: 'FIRST_CALL', name: '1st Call' },
   { code: 'CONTACTED', name: 'Contacted' },
   { code: 'QUALIFIED', name: 'Qualified' },
   { code: 'DEMO_SCHEDULED', name: 'Demo Scheduled' },

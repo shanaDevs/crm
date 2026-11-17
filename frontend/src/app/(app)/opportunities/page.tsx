@@ -15,11 +15,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, NotebookPen, Phone } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import type { Company, Opportunity, OpportunityStage, Product } from '@/lib/types'
+import type { CallDialMode, Company, Contact, DialOptions, Opportunity, OpportunityStage, Product } from '@/lib/types'
 import { fullName } from '@/lib/format'
+import { useCallDesk } from '@/components/CallDeskProvider'
 import {
   Button,
   EmptyState,
@@ -45,6 +46,20 @@ const emptyForm = (companyId = '') => ({
   notes: '',
 })
 
+function companyArea(company?: Company | null) {
+  if (!company) return ''
+  return [company.city, company.state, company.country].filter(Boolean).join(', ')
+}
+
+function contactPhones(contact: Contact) {
+  const phones: { label: string; value: string }[] = []
+  if (contact.mobile?.trim()) phones.push({ label: `${contact.firstName} mobile`, value: contact.mobile.trim() })
+  if (contact.phone?.trim() && contact.phone.trim() !== contact.mobile?.trim()) {
+    phones.push({ label: `${contact.firstName} phone`, value: contact.phone.trim() })
+  }
+  return phones
+}
+
 export default function OpportunitiesPage({
   searchParams,
 }: {
@@ -54,6 +69,8 @@ export default function OpportunitiesPage({
   const presetCompanyId = typeof query.companyId === 'string' ? query.companyId : ''
   const { can } = useAuth()
   const canWrite = can('opportunities.write')
+  const canCall = can('calls.write')
+  const { startOutbound, refreshDialOptions, dialOptions } = useCallDesk()
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [stages, setStages] = useState<OpportunityStage[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
@@ -66,10 +83,25 @@ export default function OpportunitiesPage({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(() => emptyForm(presetCompanyId))
+  const [search, setSearch] = useState('')
+  const [area, setArea] = useState('')
+  const [notesOpp, setNotesOpp] = useState<Opportunity | null>(null)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [notesSaving, setNotesSaving] = useState(false)
+  const [callOpp, setCallOpp] = useState<Opportunity | null>(null)
+  const [callPhone, setCallPhone] = useState('')
+  const [callContactId, setCallContactId] = useState('')
+  const [callDialMode, setCallDialMode] = useState<CallDialMode>('PHONE')
+  const [callBusy, setCallBusy] = useState(false)
+  const [callOptions, setCallOptions] = useState<DialOptions | null>(dialOptions)
 
-  function load() {
+  function load(nextSearch = search, nextArea = area) {
+    const params = new URLSearchParams()
+    if (nextSearch.trim()) params.set('q', nextSearch.trim())
+    if (nextArea.trim()) params.set('area', nextArea.trim())
+    const qs = params.toString()
     return Promise.all([
-      api<Opportunity[]>('/api/opportunities'),
+      api<Opportunity[]>(`/api/opportunities${qs ? `?${qs}` : ''}`),
       api<OpportunityStage[]>('/api/opportunities/stages'),
       api<Company[]>('/api/customers').catch(() => [] as Company[]),
       api<Product[]>('/api/products').catch(() => [] as Product[]),
@@ -86,7 +118,32 @@ export default function OpportunitiesPage({
 
   useEffect(() => {
     void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const onCompleted = () => {
+      void load()
+    }
+    window.addEventListener('crm:call-completed', onCompleted)
+    return () => window.removeEventListener('crm:call-completed', onCompleted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, area])
+
+  const areas = useMemo(() => {
+    const set = new Set<string>()
+    for (const opp of opportunities) {
+      const city = opp.company?.city?.trim()
+      const state = opp.company?.state?.trim()
+      if (city) set.add(city)
+      if (state) set.add(state)
+    }
+    for (const c of companies) {
+      if (c.city?.trim()) set.add(c.city.trim())
+      if (c.state?.trim()) set.add(c.state.trim())
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [opportunities, companies])
 
   const byStage = useMemo(() => {
     const map = new Map<string, Opportunity[]>()
@@ -102,12 +159,16 @@ export default function OpportunitiesPage({
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeOpp = activeId ? opportunities.find((o) => o.id === activeId) : undefined
-  // Touch needs a long-press so the board can still be scrolled with a finger.
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   )
+
+  const availableModes = useMemo(() => {
+    if (!callOptions) return ['PHONE'] as CallDialMode[]
+    return (Object.keys(callOptions.modes) as CallDialMode[]).filter((m) => callOptions.modes[m].available)
+  }, [callOptions])
 
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id))
@@ -153,6 +214,29 @@ export default function OpportunitiesPage({
     setOpen(true)
   }
 
+  function openNotes(opp: Opportunity) {
+    setNotesOpp(opp)
+    setNotesDraft(opp.notes || '')
+  }
+
+  async function openCall(opp: Opportunity) {
+    setError(null)
+    setCallOpp(opp)
+    const contacts = opp.company?.contacts || []
+    const phoneChoices = contacts.flatMap((c) =>
+      contactPhones(c).map((p) => ({ ...p, contactId: c.id })),
+    )
+    const first = phoneChoices[0]
+    setCallPhone(first?.value || '')
+    setCallContactId(first?.contactId || '')
+    const opts = (await refreshDialOptions()) || dialOptions
+    setCallOptions(opts)
+    const modes = opts
+      ? (Object.keys(opts.modes) as CallDialMode[]).filter((m) => opts.modes[m].available)
+      : (['PHONE'] as CallDialMode[])
+    setCallDialMode(modes[0] || 'PHONE')
+  }
+
   async function onDelete(opp: Opportunity) {
     if (!window.confirm(`Delete opportunity "${opp.title}"?`)) return
     try {
@@ -189,6 +273,53 @@ export default function OpportunitiesPage({
     }
   }
 
+  async function onSaveNotes(e: FormEvent) {
+    e.preventDefault()
+    if (!notesOpp) return
+    setNotesSaving(true)
+    try {
+      await api(`/api/opportunities/${notesOpp.id}`, {
+        method: 'PATCH',
+        body: { notes: notesDraft.trim() || null },
+      })
+      setNotesOpp(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save notes')
+    } finally {
+      setNotesSaving(false)
+    }
+  }
+
+  async function onStartCall(e: FormEvent) {
+    e.preventDefault()
+    if (!callOpp || !callPhone.trim()) return
+    setCallBusy(true)
+    setError(null)
+    try {
+      await startOutbound({
+        phone: callPhone.trim(),
+        dialMode: callDialMode,
+        companyId: callOpp.companyId || callOpp.company?.id || null,
+        contactId: callContactId || null,
+        opportunityId: callOpp.id,
+        notes: `Opportunity: ${callOpp.title}`,
+      })
+      setCallOpp(null)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to start call')
+    } finally {
+      setCallBusy(false)
+    }
+  }
+
+  const callPhoneChoices = useMemo(() => {
+    if (!callOpp?.company?.contacts) return [] as { label: string; value: string; contactId: string }[]
+    return callOpp.company.contacts.flatMap((c) =>
+      contactPhones(c).map((p) => ({ ...p, contactId: c.id })),
+    )
+  }, [callOpp])
+
   return (
     <div>
       <PageHeader
@@ -217,6 +348,51 @@ export default function OpportunitiesPage({
         }
       />
       <ErrorBanner message={error} />
+
+      <form
+        className="mb-4 flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          setLoading(true)
+          void load()
+        }}
+      >
+        <Field label="Search" className="min-w-56 flex-1">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Title, customer, product, address…"
+          />
+        </Field>
+        <Field label="Area" className="min-w-40">
+          <Select value={area} onChange={(e) => setArea(e.target.value)}>
+            <option value="">All areas</option>
+            {areas.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Button type="submit" variant="secondary">
+          Search
+        </Button>
+        {search || area ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setSearch('')
+              setArea('')
+              setLoading(true)
+              void load('', '')
+            }}
+          >
+            Clear
+          </Button>
+        ) : null}
+      </form>
+
       {loading ? (
         <LoadingState />
       ) : stages.length === 0 ? (
@@ -244,16 +420,32 @@ export default function OpportunitiesPage({
                           opp={opp}
                           draggable={canWrite}
                           actions={
-                            canWrite ? (
-                              <div className="mt-2 flex gap-2" onKeyDown={(e) => e.stopPropagation()}>
-                                <Button size="sm" variant="secondary" onClick={() => openEdit(opp)}>
-                                  Edit
+                            <div
+                              className="mt-2 flex flex-wrap gap-2"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            >
+                              {canCall ? (
+                                <Button size="sm" variant="secondary" onClick={() => void openCall(opp)}>
+                                  <Phone className="mr-1 h-3.5 w-3.5" />
+                                  Call
                                 </Button>
-                                <Button size="sm" variant="danger" onClick={() => void onDelete(opp)}>
-                                  Delete
-                                </Button>
-                              </div>
-                            ) : null
+                              ) : null}
+                              {canWrite ? (
+                                <>
+                                  <Button size="sm" variant="secondary" onClick={() => openNotes(opp)}>
+                                    <NotebookPen className="mr-1 h-3.5 w-3.5" />
+                                    Notes
+                                  </Button>
+                                  <Button size="sm" variant="secondary" onClick={() => openEdit(opp)}>
+                                    Edit
+                                  </Button>
+                                  <Button size="sm" variant="danger" onClick={() => void onDelete(opp)}>
+                                    Delete
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
                           }
                         />
                       </DraggableCard>
@@ -285,6 +477,7 @@ export default function OpportunitiesPage({
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                  {companyArea(c) ? ` · ${companyArea(c)}` : ''}
                 </option>
               ))}
             </Select>
@@ -334,6 +527,74 @@ export default function OpportunitiesPage({
           </Field>
           <Button type="submit" className="w-full" disabled={saving}>
             {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
+          </Button>
+        </form>
+      </Modal>
+
+      <Modal open={Boolean(notesOpp)} title={`Notes · ${notesOpp?.title || ''}`} onClose={() => setNotesOpp(null)}>
+        <form onSubmit={onSaveNotes} className="space-y-3">
+          <Field label="Opportunity notes">
+            <Textarea rows={6} value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} />
+          </Field>
+          <Button type="submit" className="w-full" disabled={notesSaving}>
+            {notesSaving ? 'Saving…' : 'Save notes'}
+          </Button>
+        </form>
+      </Modal>
+
+      <Modal open={Boolean(callOpp)} title={`Call · ${callOpp?.title || ''}`} onClose={() => setCallOpp(null)}>
+        <form onSubmit={onStartCall} className="space-y-3">
+          <p className="text-sm text-[var(--muted)]">
+            {callOpp?.company?.name || 'Customer'}
+            {companyArea(callOpp?.company) ? ` · ${companyArea(callOpp?.company)}` : ''}
+          </p>
+          {callPhoneChoices.length > 0 ? (
+            <Field label="Contact number">
+              <Select
+                value={`${callContactId}::${callPhone}`}
+                onChange={(e) => {
+                  const [contactId, ...rest] = e.target.value.split('::')
+                  setCallContactId(contactId)
+                  setCallPhone(rest.join('::'))
+                }}
+              >
+                {callPhoneChoices.map((p) => (
+                  <option key={`${p.contactId}-${p.value}`} value={`${p.contactId}::${p.value}`}>
+                    {p.label}: {p.value}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Phone number">
+              <Input
+                required
+                value={callPhone}
+                onChange={(e) => {
+                  setCallPhone(e.target.value)
+                  setCallContactId('')
+                }}
+                placeholder="0771234567"
+              />
+            </Field>
+          )}
+          <Field label="Dial mode">
+            <Select value={callDialMode} onChange={(e) => setCallDialMode(e.target.value as CallDialMode)}>
+              {availableModes.map((m) => (
+                <option key={m} value={m}>
+                  {callOptions?.modes[m]?.label || m}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {callDialMode === 'PHONE' ? (
+            <p className="text-xs text-[var(--muted)]">
+              Opens your phone dialer. When you finish, complete the call panel so it is saved in CRM. The first call
+              on a New opportunity moves it to 1st Call.
+            </p>
+          ) : null}
+          <Button type="submit" className="w-full" disabled={callBusy || !callPhone.trim()}>
+            {callBusy ? 'Connecting…' : 'Start call'}
           </Button>
         </form>
       </Modal>
@@ -391,6 +652,7 @@ function OpportunityCard({
   draggable: boolean
   actions?: React.ReactNode
 }) {
+  const area = companyArea(opp.company)
   return (
     <div className="rounded-lg border border-[var(--border)] bg-white p-3 shadow-sm">
       <div className="flex items-start gap-1.5">
@@ -405,10 +667,16 @@ function OpportunityCard({
             ) : null}{' '}
             · {opp.product?.name}
           </p>
+          {area ? <p className="mt-1 text-xs text-[var(--muted)]">{area}</p> : null}
           <p className="mt-1 text-xs text-[var(--muted)]">
             {opp.value != null ? `${opp.currency || 'LKR'} ${Number(opp.value).toLocaleString()}` : 'No value'} ·{' '}
             {fullName(opp.owner)}
           </p>
+          {opp.notes ? (
+            <p className="mt-1 line-clamp-2 text-xs text-slate-600" title={opp.notes}>
+              {opp.notes}
+            </p>
+          ) : null}
           {actions}
         </div>
       </div>

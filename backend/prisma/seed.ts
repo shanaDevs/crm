@@ -16,13 +16,14 @@ async function main() {
     isLost?: boolean
   }> = [
     { code: 'NEW', name: 'New', sortOrder: 1 },
-    { code: 'CONTACTED', name: 'Contacted', sortOrder: 2 },
-    { code: 'QUALIFIED', name: 'Qualified', sortOrder: 3 },
-    { code: 'DEMO_SCHEDULED', name: 'Demo Scheduled', sortOrder: 4 },
-    { code: 'PROPOSAL_SENT', name: 'Proposal Sent', sortOrder: 5 },
-    { code: 'NEGOTIATION', name: 'Negotiation', sortOrder: 6 },
-    { code: 'WON', name: 'Won', sortOrder: 7, isWon: true },
-    { code: 'LOST', name: 'Lost', sortOrder: 8, isLost: true },
+    { code: 'FIRST_CALL', name: '1st Call', sortOrder: 2 },
+    { code: 'CONTACTED', name: 'Contacted', sortOrder: 3 },
+    { code: 'QUALIFIED', name: 'Qualified', sortOrder: 4 },
+    { code: 'DEMO_SCHEDULED', name: 'Demo Scheduled', sortOrder: 5 },
+    { code: 'PROPOSAL_SENT', name: 'Proposal Sent', sortOrder: 6 },
+    { code: 'NEGOTIATION', name: 'Negotiation', sortOrder: 7 },
+    { code: 'WON', name: 'Won', sortOrder: 8, isWon: true },
+    { code: 'LOST', name: 'Lost', sortOrder: 9, isLost: true },
   ]
   for (const s of stages) {
     await prisma.opportunityStage.upsert({

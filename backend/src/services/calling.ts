@@ -19,9 +19,18 @@ export const callSessionInclude = {
   contact: {
     select: { id: true, firstName: true, lastName: true, mobile: true, phone: true, email: true },
   },
+  opportunity: { select: { id: true, title: true, stageId: true } },
   assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
   createdBy: { select: { id: true, firstName: true, lastName: true } },
 } satisfies Prisma.CallSessionInclude
+
+export async function ensureFirstCallStage() {
+  return prisma.opportunityStage.upsert({
+    where: { code: 'FIRST_CALL' },
+    create: { code: 'FIRST_CALL', name: '1st Call', sortOrder: 2 },
+    update: { name: '1st Call' },
+  })
+}
 
 export async function getCallingSettings(): Promise<CallingSettings> {
   const row = await prisma.systemSetting.findUnique({ where: { key: 'calling' } })

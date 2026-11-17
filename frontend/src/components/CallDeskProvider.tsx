@@ -32,6 +32,7 @@ type StartOutboundInput = {
   dialMode: CallDialMode
   companyId?: string | null
   contactId?: string | null
+  opportunityId?: string | null
   notes?: string | null
 }
 
@@ -205,6 +206,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
           dialMode: input.dialMode,
           companyId: input.companyId,
           contactId: input.contactId,
+          opportunityId: input.opportunityId,
           notes: input.notes,
           queue: false,
         },
@@ -239,6 +241,7 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         clearProviders()
         const durationSec =
           startedAtRef.current != null ? Math.round((Date.now() - startedAtRef.current) / 1000) : undefined
+        const opportunityId = active.opportunityId
         await api(`/api/calls/${active.id}/complete`, {
           method: 'POST',
           body: { outcome: selectedOutcome, notes: selectedNotes || null, durationSec },
@@ -246,6 +249,13 @@ export function CallDeskProvider({ children }: { children: ReactNode }) {
         setActive(null)
         setActiveId(null)
         startedAtRef.current = null
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('crm:call-completed', {
+              detail: { opportunityId: opportunityId || null },
+            }),
+          )
+        }
       } finally {
         setCompleting(false)
       }

@@ -16,6 +16,7 @@ import { uploadPrivateFile } from '../services/storage'
 import {
   assertDialModeAvailable,
   callSessionInclude,
+  ensureFirstCallStage,
   findCompanyByPhone,
   getCallingSettings,
   getDialOptions,
@@ -44,6 +45,7 @@ const outcomeSchema = z.enum([
 const outboundSchema = z.object({
   companyId: z.string().optional().nullable(),
   contactId: z.string().optional().nullable(),
+  opportunityId: z.string().optional().nullable(),
   phone: z.string().min(3),
   dialMode: dialModeSchema,
   followUpId: z.string().optional().nullable(),
@@ -463,6 +465,12 @@ router.post('/outbound', requirePermission('calls.write'), async (req, res) => {
 
   let companyId = parsed.data.companyId || null
   let contactId = parsed.data.contactId || null
+  let opportunityId = parsed.data.opportunityId || null
+  if (opportunityId) {
+    const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } })
+    if (!opportunity) return res.status(400).json({ error: 'Opportunity not found' })
+    companyId = companyId || opportunity.companyId
+  }
   if (contactId) {
     const contact = await prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact) return res.status(400).json({ error: 'Contact not found' })
@@ -481,6 +489,7 @@ router.post('/outbound', requirePermission('calls.write'), async (req, res) => {
       phoneE164,
       companyId,
       contactId,
+      opportunityId,
       followUpId: parsed.data.followUpId || null,
       notes: parsed.data.notes || null,
       createdById: req.user!.id,
@@ -624,6 +633,38 @@ router.post('/:id/complete', requirePermission('calls.write'), async (req, res) 
     },
     include: callSessionInclude,
   })
+
+  // First completed call on a New opportunity moves it to 1st Call.
+  if (existing.opportunityId) {
+    const priorCompleted = await prisma.callSession.count({
+      where: {
+        opportunityId: existing.opportunityId,
+        status: CallSessionStatus.COMPLETED,
+        id: { not: existing.id },
+      },
+    })
+    if (priorCompleted === 0) {
+      const opportunity = await prisma.opportunity.findUnique({
+        where: { id: existing.opportunityId },
+        include: { stage: true },
+      })
+      if (opportunity && (opportunity.stage.code === 'NEW' || !opportunity.stage.code)) {
+        const firstCallStage = await ensureFirstCallStage()
+        const callNote = parsed.data.notes ?? existing.notes
+        const stamp = `[Call ${new Date().toISOString().slice(0, 16).replace('T', ' ')}] ${parsed.data.outcome}${
+          callNote ? ` — ${callNote}` : ''
+        }`
+        await prisma.opportunity.update({
+          where: { id: opportunity.id },
+          data: {
+            stageId: firstCallStage.id,
+            notes: opportunity.notes ? `${opportunity.notes}\n${stamp}` : stamp,
+          },
+        })
+      }
+    }
+  }
+
   return res.json(updated)
 })
 
